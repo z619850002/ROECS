@@ -58,6 +58,44 @@ class DirectUnaryEdge : public g2o::BaseUnaryEdge<1 , double , g2o::VertexSE3Exp
                 //Out of boundary.
                 _jacobianOplusXi = Eigen::Matrix<double, 1, 6>::Zero();
             }
+            //calculate basic attributes.
+            const g2o::VertexSE3Expmap * pPoseVertex = static_cast<const g2o::VertexSE3Expmap *>(_vertices[0]);
+            //The coordinate in camera coordinate system.
+            Eigen::Vector3d mPoint_Camera = pPoseVertex->estimate().map(m_mPoint3d);
+            //Map the point on the image.
+            double nInverseDepth = 1.0 / mPoint_Camera[2];
+            double x = mPoint_Camera[0];
+            double y = mPoint_Camera[1];
+            double z = mPoint_Camera[2];
+
+            float u = mPoint_Camera[0] * m_nFx / mPoint_Camera[2] + m_nCx;
+            float v = mPoint_Camera[1] * m_nFy / mPoint_Camera[2] + m_nCy;
+ 
+
+            //Jacobian.
+            Eigen::Matrix<double , 2 , 6> jacobian_uv_ksai;
+
+            jacobian_uv_ksai(0 , 0) = - x*y / (z*z) * m_nFx;
+            jacobian_uv_ksai(0 , 1) = (1 + (x*x / (z*z))) * m_nFx;
+            jacobian_uv_ksai(0 , 2) = - y/z * m_nFx;
+            jacobian_uv_ksai(0 , 3) = m_nFx/z;
+            jacobian_uv_ksai(0 , 4) = 0.0;
+            jacobian_uv_ksai(0 , 5) = -x/(z*z) * m_nFx;
+
+            jacobian_uv_ksai(1 , 0) = -(1+y*y/(z*z))*m_nFy;
+            jacobian_uv_ksai(1 , 1) = x*y / (z*z) * m_nFy;
+            jacobian_uv_ksai(1 , 2) = x / z * m_nFy;
+            jacobian_uv_ksai(1 , 3) = 0.0;
+            jacobian_uv_ksai(1 , 4) = m_nFy / z;
+            jacobian_uv_ksai(1 , 5) = -y / (z*z) * m_nFy;
+
+            Eigen::Matrix<double , 1 , 2> jacobian_pixel_uv;
+
+            jacobian_pixel_uv(0 , 0) = (getPixelValue(u+1, v) - getPixelValue(u-1, v))/2;
+
+            jacobian_pixel_uv(0 , 1) = (getPixelValue(u, v+1) - getPixelValue(u, v-1))/2;
+
+            _jacobianOplusXi = jacobian_pixel_uv * jacobian_uv_ksai;
         }
 
         virtual bool read(std::istream in) {}
