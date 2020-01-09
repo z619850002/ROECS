@@ -106,7 +106,7 @@ Initializer::Initializer(){
 
 }
 
-void Initializer::initializePose(Sophus::SE3& T_FG,Sophus::SE3& T_LG,
+void Initializer::InitializePose(Sophus::SE3& T_FG,Sophus::SE3& T_LG,
 						Sophus::SE3& T_BG,Sophus::SE3& T_RG){
 
 	T_FG = this->m_mT_FG;
@@ -117,7 +117,7 @@ void Initializer::initializePose(Sophus::SE3& T_FG,Sophus::SE3& T_LG,
 
 
 
-void Initializer::initializeK(	Eigen::Matrix3d& K_F, Eigen::Matrix3d& K_L,
+void Initializer::InitializeK(	Eigen::Matrix3d& K_F, Eigen::Matrix3d& K_L,
 					 			Eigen::Matrix3d& K_B, Eigen::Matrix3d& K_R){
 	K_F = this->m_mK_F;
 	K_L = this->m_mK_L;
@@ -126,7 +126,7 @@ void Initializer::initializeK(	Eigen::Matrix3d& K_F, Eigen::Matrix3d& K_L,
 }
 
 
-void Initializer::initializeD(	Eigen::Vector4d& D_F, Eigen::Vector4d& D_L,
+void Initializer::InitializeD(	Eigen::Vector4d& D_F, Eigen::Vector4d& D_L,
 					 			Eigen::Vector4d& D_B, Eigen::Vector4d& D_R){
 	D_F = this->m_mD_F;
 	D_L = this->m_mD_L;

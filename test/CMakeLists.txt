@@ -1,0 +1,2 @@
+ADD_EXECUTABLE(initializer_test initializer_test.cpp)
+TARGET_LINK_LIBRARIES( initializer_test dynamic_adjustment)
