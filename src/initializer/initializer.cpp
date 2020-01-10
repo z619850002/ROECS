@@ -1,5 +1,6 @@
-#include "../include/initializer/initializer.h"
+#include "../../include/initializer/initializer.h"
 
+using namespace std;
 
 
 
@@ -132,6 +133,19 @@ void Initializer::InitializeD(	Eigen::Vector4d& D_F, Eigen::Vector4d& D_L,
 	D_L = this->m_mD_L;
 	D_B = this->m_mD_B;
 	D_R = this->m_mD_R;
+}
+
+
+
+void Initializer::InitializeCameras(Camera * pFrontCamera,
+									Camera * pLeftCamera,
+									Camera * pBackCamera,
+									Camera * pRightCamera){
+
+	pFrontCamera = new Camera("Front", this->m_mT_FG, this->m_mK_F, this->m_mD_F);
+	pLeftCamera =  new Camera("Left",this->m_mT_LG, this->m_mK_L, this->m_mD_L);
+	pBackCamera =  new Camera("Back",this->m_mT_BG, this->m_mK_B, this->m_mD_B);
+	pRightCamera = new Camera("Right",this->m_mT_RG, this->m_mK_R, this->m_mD_R);
 }
 
 

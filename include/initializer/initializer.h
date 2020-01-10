@@ -6,6 +6,7 @@
 #include <Eigen/Geometry>
 #include "sophus/se3.h"
 #include <queue>
+#include "../camera/camera.h"
 
 class Initializer
 {
@@ -18,6 +19,11 @@ public:
 					 Eigen::Matrix3d& K_B, Eigen::Matrix3d& K_R);
 	void InitializeD(Eigen::Vector4d& D_F, Eigen::Vector4d& D_L,
 					 Eigen::Vector4d& D_B, Eigen::Vector4d& D_R);	
+
+	void InitializeCameras(	Camera * pFrontCamera,
+										Camera * pLeftCamera,
+										Camera * pBackCamera,
+										Camera * pRightCamera);
 
 private: 
 	//The pose of the camera.

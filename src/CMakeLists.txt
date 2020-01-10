@@ -1,6 +1,9 @@
 ADD_LIBRARY( dynamic_adjustment SHARED
-	initializer.cpp
-	camera.cpp
+	./initializer/initializer.cpp
+	./camera/camera.cpp
+	./frame/frame.cpp
+	./frame/frame_pair.cpp
+	./loader/frame_loader.cpp
 )
 
 
