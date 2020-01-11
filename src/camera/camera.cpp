@@ -14,3 +14,13 @@ Camera::Camera(	string aCameraName, Sophus::SE3 mT,
 {
 
 }
+
+
+bool Camera::BlurPose(){
+	//Add a disturbance to the pose of the camera.
+	Eigen::Matrix<double,6,1>  V6;
+	V6<<0.01, -0.01, 0.01, -0.01, 0.01, -0.01;
+	this->m_mT = Sophus::SE3::exp(this->m_mT.log()+V6*2);
+
+	return true;
+}

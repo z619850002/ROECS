@@ -137,10 +137,10 @@ void Initializer::InitializeD(	Eigen::Vector4d& D_F, Eigen::Vector4d& D_L,
 
 
 
-void Initializer::InitializeCameras(Camera * pFrontCamera,
-									Camera * pLeftCamera,
-									Camera * pBackCamera,
-									Camera * pRightCamera){
+void Initializer::InitializeCameras(Camera * & pFrontCamera,
+									Camera * & pLeftCamera,
+									Camera * & pBackCamera,
+									Camera * & pRightCamera){
 
 	pFrontCamera = new Camera("Front", this->m_mT_FG, this->m_mK_F, this->m_mD_F);
 	pLeftCamera =  new Camera("Left",this->m_mT_LG, this->m_mK_L, this->m_mD_L);

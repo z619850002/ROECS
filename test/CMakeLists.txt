@@ -8,3 +8,7 @@ TARGET_LINK_LIBRARIES( direct_unary_edge_test dynamic_adjustment)
 
 ADD_EXECUTABLE(frame_loader_test frame_loader_test.cpp)
 TARGET_LINK_LIBRARIES( frame_loader_test dynamic_adjustment)
+
+
+ADD_EXECUTABLE(surround_view_test surround_view_test.cpp)
+TARGET_LINK_LIBRARIES( surround_view_test dynamic_adjustment)

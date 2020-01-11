@@ -28,11 +28,15 @@ bool FrameLoader::LoadFilenames(string aDirectoryName){
 		return false;
 	}
 
+	// for (auto item : gAllFileNames){
+	// 	cout << item << endl;
+	// }
+
 	for (int i=0;i<gAllFileNames.size()/4;i++){
-		this->m_gBackFilenames.push_back((string)gAllFileNames[i]);
-		this->m_gFrontFilenames.push_back((string)gAllFileNames[i + gAllFileNames.size()/4]);
-		this->m_gLeftFilenames.push_back((string)gAllFileNames[i + gAllFileNames.size()/2]);
-		this->m_gRightFilenames.push_back((string)gAllFileNames[i + gAllFileNames.size()/4*3]);
+		this->m_gBackFilenames.push_back((string)gAllFileNames[i*4]);
+		this->m_gFrontFilenames.push_back((string)gAllFileNames[i*4+1]);
+		this->m_gLeftFilenames.push_back((string)gAllFileNames[i*4+2]);
+		this->m_gRightFilenames.push_back((string)gAllFileNames[i*4+3]);
 	}
 
 	return true;

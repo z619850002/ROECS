@@ -27,6 +27,8 @@ public:
 	Camera(	string aCameraName, Sophus::SE3 mT, 
 			Eigen::Matrix3d mK, Eigen::Vector4d mD);
 
+	bool BlurPose();
+
 	string m_aCameraName;
 
 	//The pose of the camera.
