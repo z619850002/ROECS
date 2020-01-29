@@ -1,203 +1,39 @@
 #include "../../include/surround/surround_view_system.h"
+#include "utils.h"
 
 using namespace std;
 
-cv::Mat eigen2mat(Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> A)
-{
-	cv::Mat B;
-	cv::eigen2cv(A,B);
-	
-	return B;
-}
 
-void imshow_64F(cv::Mat img,string img_name)
-{
-	cv::Mat img_norm,img_color;
-	cv::normalize(img,img_norm,0,255,cv::NORM_MINMAX,CV_8U);
-	cv::applyColorMap(img_norm,img_color, cv::COLORMAP_JET);
-	cv::namedWindow(img_name,0);
-	cv::imshow(img_name,img_color);
-	
-	return;
-}
-
-void imshow_64F_gray(cv::Mat img,string img_name)
-{
-	cv::Mat img_8U;
-	img.convertTo(img_8U,CV_8U);
-	cv::namedWindow(img_name,0);
-	cv::imshow(img_name,img_8U);
-	
-	return;
-}
-
-cv::Mat bilinear_interpolation(cv::Mat img,cv::Mat pix_table,int rows, int cols)
-{
-	cv::Mat img_G(rows,cols,CV_8UC3);
-	// f is float
-	cv::Mat img_G_f(rows,cols,CV_64FC3);
-	cv::Mat img_f;
-	img.convertTo(img_f, CV_64FC3);
-	float x;
-	float y;
-	int x_floor;
-	int y_floor;
-	int x_ceil;
-	int y_ceil;
-	cv::Vec3d ul;
-	cv::Vec3d ur;
-	cv::Vec3d dl;
-	cv::Vec3d dr;
-	cv::Vec3d pix;
-	
-	
-	for(int i=0;i<rows;i++)
-	{
-		for(int j=0;j<cols;j++)
-		{
-			x = pix_table.at<cv::Vec2d>(i,j)[1];
-			y = pix_table.at<cv::Vec2d>(i,j)[0];
-			if(x<0 || y<0 || (y>=img.cols-1) || (x>=img.rows-1))
-			{
-				img_G_f.at<cv::Vec3d>(i,j) = cv::Vec3d(0,0,0);
-			}
-			else{
-				x_floor = int(floor(x));
-				x_ceil = x_floor+1;
-				y_floor = int(floor(y));
-				y_ceil = y_floor+1;
-				
-				ul = img_f.at<cv::Vec3d>(x_floor,y_floor);
-				ur = img_f.at<cv::Vec3d>(x_ceil,y_floor);
-				dl = img_f.at<cv::Vec3d>(x_floor,y_ceil);
-				dr = img_f.at<cv::Vec3d>(x_ceil,y_ceil);
-				pix = (ur*(x-x_floor)+ul*(x_ceil-x))*(y_ceil-y)
-					 +(dr*(x-x_floor)+dl*(x_ceil-x))*(y-y_floor);
-				if(pix(0)>=0   && pix(1)>=0   && pix(2)>=0 && 
-				   pix(0)<=255 && pix(1)<=255 && pix(2)<=255)
-				{
-					img_G_f.at<cv::Vec3d>(j,i) = pix;
-				}
-			}
-		}
-	}
-	
-	img_G_f.convertTo(img_G, CV_8UC3);
-	
-	return img_G;
-}
-
-cv::Mat project_on_ground(cv::Mat img, Sophus::SE3 T_CG,
-						  Eigen::Matrix3d K_C,Eigen::Vector4d D_C,
-						  cv::Mat K_G,int rows, int cols)
-{
-// 	cout<<"--------------------Init p_G and P_G------------------------"<<endl;
-	cv::Mat p_G = cv::Mat::ones(3,rows*cols,CV_64FC1);
-	for(int i=0;i<rows;i++)
-	{
-		for(int j=0;j<cols;j++)
-		{
-			p_G.at<double>(0,cols*i+j) = j;
-			p_G.at<double>(1,cols*i+j) = i;
-		}
-	}
-	
-	cv::Mat P_G = cv::Mat::ones(4,rows*cols,CV_64FC1);
-	P_G(cv::Rect(0,0,rows*cols,3)) = K_G.inv()*p_G;
-	P_G(cv::Rect(0,2,rows*cols,1)) = 0;
-	
-// 	cout<<"--------------------Init P_GF------------------------"<<endl;
-
-	cv::Mat P_GC = cv::Mat::zeros(4,rows*cols,CV_64FC1);
-	cv::Mat T_CG_(4,4,CV_64FC1);
-	cv::eigen2cv(T_CG.matrix(),T_CG_);
-	P_GC =  T_CG_ * P_G;
-
-	
-// 	cout<<"--------------------Init P_GF1------------------------"<<endl;
-	cv::Mat P_GC1 = cv::Mat::zeros(1,rows*cols,CV_64FC2);
-	vector<cv::Mat> channels(2);
-	cv::split(P_GC1, channels);
-	channels[0] = P_GC(cv::Rect(0,0,rows*cols,1))/P_GC(cv::Rect(0,2,rows*cols,1));
-	channels[1] = P_GC(cv::Rect(0,1,rows*cols,1))/P_GC(cv::Rect(0,2,rows*cols,1));
-	cv::merge(channels, P_GC1);
-// 	cout<<"P_GC1: "<<endl;
-// 	cout<<P_GC1(cv::Rect(0,0,5,1))<<endl<<endl;
-	
-// 	cout<<"--------------------Init p_GF------------------------"<<endl;
-// 	cout<<K_C.cols()<<endl;
-	cv::Mat p_GC = cv::Mat::zeros(1,rows*cols,CV_64FC2);
-// 	cout<<eigen2mat(K_C)<<endl;
-	vector<double> D_C_{D_C(0,0),D_C(1,0),D_C(2,0),D_C(3,0)};
-	cv::fisheye::distortPoints(P_GC1,p_GC,eigen2mat(K_C),D_C_);
-// 	cout<<"p_GC: "<<endl;
-	p_GC.reshape(rows,cols);
-	cv::Mat p_GC_table = p_GC.reshape(0,rows);
-	vector<cv::Mat> p_GC_table_channels(2);
-	cv::split(p_GC_table, p_GC_table_channels);
-	
-	cv::Mat p_GC_table_32F;
-	p_GC_table.convertTo(p_GC_table_32F,CV_32FC2);
-	
-	cv::Mat img_GC;
-	cv::remap(img,img_GC,p_GC_table_32F,cv::Mat(),cv::INTER_LINEAR);
-// 	img_GC = bilinear_interpolation(img,p_GC_table,rows,cols);
-// 	cout<<img_GC.size<<endl;
-	
-	return img_GC;
-}
-
-
-cv::Mat generate_surround_view(cv::Mat img_GF, cv::Mat img_GL, 
-							   cv::Mat img_GB, cv::Mat img_GR, 
-							   int rows, int cols)
-{
-	cv::Mat img_G(rows,cols,CV_8UC3);
-	for(int i=0;i<rows;i++)
-	{
-		for(int j=0;j<cols;j++)
-		{
-			if(i>2*j-500)
-			{
-				if(i>-2*j+1500)
-				{
-					img_G.at<cv::Vec3b>(i,j) = img_GB.at<cv::Vec3b>(i,j);
-				}
-				else
-				{
-					img_G.at<cv::Vec3b>(i,j) = img_GL.at<cv::Vec3b>(i,j);
-				}
-				
-			}
-			else
-			{
-				if(i>-2*j+1500)
-				{
-					img_G.at<cv::Vec3b>(i,j) = img_GR.at<cv::Vec3b>(i,j);
-				}
-				else
-				{
-					img_G.at<cv::Vec3b>(i,j) = img_GF.at<cv::Vec3b>(i,j);
-				}
-			}
-			
-		}
-	}
-	
-	for(int i=300;i<700;i++)
-	{
-		for(int j=400;j<600;j++)
-		{
-			img_G.at<cv::Vec3b>(i,j) = cv::Vec3b(0,0,0);
-		}
-	}
-	
-	return img_G;
-}
 
 
 
 SurroundView::SurroundView(){
+	//Generate ROI.
+	//Determined optimized ROI.
+	int ROI_FL_x = 200;
+	int ROI_FL_y = 0;
+	int ROI_FL_w = 200;
+	int ROI_FL_h = 200;
+	
+	int ROI_LB_x = 200;
+	int ROI_LB_y = 800;
+	int ROI_LB_w = 200;
+	int ROI_LB_h = 200;
+	
+	int ROI_BR_x = 650;
+	int ROI_BR_y = 800;
+	int ROI_BR_w = 200;
+	int ROI_BR_h = 200;
+	
+	int ROI_RF_x = 650;
+	int ROI_RF_y = 0;
+	int ROI_RF_w = 200;
+	int ROI_RF_h = 200;
+	
+	this->m_iROI_FL = cv::Rect(ROI_FL_x-50,ROI_FL_y,ROI_FL_w,ROI_FL_h+70);
+	this->m_iROI_LB = cv::Rect(ROI_LB_x,ROI_LB_y-100,ROI_LB_w,ROI_LB_h+70);
+	this->m_iROI_BR = cv::Rect(ROI_BR_x,ROI_BR_y-100,ROI_BR_w,ROI_BR_h+70);
+	this->m_iROI_RF = cv::Rect(ROI_RF_x,ROI_RF_y,ROI_RF_w,ROI_RF_h+70);
 
 }
 
@@ -208,8 +44,146 @@ SurroundView::SurroundView(	Camera * pFrontCamera, Camera * pLeftCamera,
 	m_pFrontCamera(pFrontCamera), m_pLeftCamera(pLeftCamera),
 	m_pBackCamera(pBackCamera), m_pRightCamera(pRightCamera)
 {
-
+	//Generate ROI.
+	//Determined optimized ROI.
+	int ROI_FL_x = 200;
+	int ROI_FL_y = 0;
+	int ROI_FL_w = 200;
+	int ROI_FL_h = 200;
+	
+	int ROI_LB_x = 200;
+	int ROI_LB_y = 800;
+	int ROI_LB_w = 200;
+	int ROI_LB_h = 200;
+	
+	int ROI_BR_x = 650;
+	int ROI_BR_y = 800;
+	int ROI_BR_w = 200;
+	int ROI_BR_h = 200;
+	
+	int ROI_RF_x = 650;
+	int ROI_RF_y = 0;
+	int ROI_RF_w = 200;
+	int ROI_RF_h = 200;
+	
+	this->m_iROI_FL = cv::Rect(ROI_FL_x-50,ROI_FL_y,ROI_FL_w,ROI_FL_h+70);
+	this->m_iROI_LB = cv::Rect(ROI_LB_x,ROI_LB_y-100,ROI_LB_w,ROI_LB_h+70);
+	this->m_iROI_BR = cv::Rect(ROI_BR_x,ROI_BR_y-100,ROI_BR_w,ROI_BR_h+70);
+	this->m_iROI_RF = cv::Rect(ROI_RF_x,ROI_RF_y,ROI_RF_w,ROI_RF_h+70);
+	
 }
+
+bool SurroundView::GetUndistortedROI(int nIndex, int nCameraIndex, cv::Mat & mROI_Left, cv::Mat & mROI_Right,
+										vector<int> & gROI_Left , vector<int> & gROI_Right){
+	//Get the original image.
+	vector<Frame *> gpFrames = {
+		this->m_gDistortedPairs[nIndex].m_pFrontFrame,
+		this->m_gDistortedPairs[nIndex].m_pLeftFrame,
+		this->m_gDistortedPairs[nIndex].m_pBackFrame,
+		this->m_gDistortedPairs[nIndex].m_pRightFrame
+	};
+	cv::Mat mOriginalImage;
+	mOriginalImage = gpFrames[nCameraIndex]->m_mFisheyeImage;
+
+	//Get the ROI and relative camera intrinsics.
+	vector<cv::Rect> gRect = {	
+		m_iROI_FL, m_iROI_RF,
+		m_iROI_LB, m_iROI_FL,
+		m_iROI_BR, m_iROI_LB,
+		m_iROI_RF, m_iROI_BR
+	};
+
+	vector<Camera *> gCamera = {
+		m_pFrontCamera,
+		m_pLeftCamera,
+		m_pBackCamera,
+		m_pRightCamera
+	};
+
+	//Get 2 overlapping region and the intrinsics.
+	cv::Rect iRectLeft = gRect[nCameraIndex*2];
+	cv::Rect iRectRight = gRect[nCameraIndex*2+1];
+	Camera * pCamera = gCamera[nCameraIndex];
+	cv::Mat mK, mD;
+	cv::eigen2cv(pCamera->m_mK, mK);
+	cv::eigen2cv(pCamera->m_mD, mD);
+
+
+	//Get 2 Rois
+	CalculateROI(mOriginalImage, mROI_Left, mK, mD, pCamera->m_mT, this->m_mK_G,
+				 iRectLeft.x, iRectLeft.y, iRectLeft.width, iRectLeft.height,
+				 gROI_Left);
+
+
+	CalculateROI(mOriginalImage, mROI_Right, mK, mD, pCamera->m_mT, this->m_mK_G,
+				 iRectRight.x, iRectRight.y, iRectRight.width, iRectRight.height,
+				 gROI_Right);
+}
+
+
+
+cv::Mat SurroundView::GenerateBirdsView(int nIndex, int nCamera, int nRows, int nCols){
+	if (nIndex >= this->m_gDistortedPairs.size()){
+		cout << "Pairs out of index, please check the index of the surround view inputed.";
+	}
+
+	SVPair iPair = this->m_gDistortedPairs[nIndex];
+
+	//Get the bird's-eye view image.
+
+	switch (nCamera) {
+		//Front
+		case 0: {
+			cv::Mat mBirdsFront = project_on_ground( iPair.m_pFrontFrame->m_mFisheyeImage,
+											 this->m_pFrontCamera->m_mT,
+											 this->m_pFrontCamera->m_mK, 
+											 this->m_pFrontCamera->m_mD,
+											 this->m_mK_G, nRows, nCols);
+			return mBirdsFront;
+		}
+		break;
+
+		case 1: {
+
+			cv::Mat mBirdsLeft = project_on_ground(  iPair.m_pLeftFrame->m_mFisheyeImage,
+													 this->m_pLeftCamera->m_mT,
+													 this->m_pLeftCamera->m_mK, 
+													 this->m_pLeftCamera->m_mD,
+													 this->m_mK_G, nRows, nCols);
+			return mBirdsLeft;
+		}
+		break;
+
+		case 2: {
+			cv::Mat mBirdsBack = project_on_ground(  iPair.m_pBackFrame->m_mFisheyeImage,
+													 this->m_pBackCamera->m_mT,
+													 this->m_pBackCamera->m_mK, 
+													 this->m_pBackCamera->m_mD,
+													 this->m_mK_G, nRows, nCols);			
+			return mBirdsBack;
+		}
+		break;
+
+		case 3: {
+			cv::Mat mBirdsRight = project_on_ground( iPair.m_pRightFrame->m_mFisheyeImage,
+													 this->m_pRightCamera->m_mT,
+													 this->m_pRightCamera->m_mK, 
+													 this->m_pRightCamera->m_mD,
+													 this->m_mK_G, nRows, nCols);
+			return mBirdsRight;
+		}
+		break;
+	
+	};
+
+	cv::Mat mNullView;
+	cout << "Wrong camera index." << endl;
+	return mNullView;
+}
+
+
+
+
 
 
 cv::Mat SurroundView::GenerateSurroundView(int nIndex, int nRows, int nCols){

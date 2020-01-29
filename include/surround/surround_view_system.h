@@ -25,6 +25,7 @@
 
 #include "../camera/camera.h"
 #include "../frame/frame_pair.h"
+#include "../optimizer/direct_unary_edge.h"
 using namespace std;
 
 class SurroundView
@@ -35,13 +36,28 @@ public:
 	SurroundView(	Camera * pFrontCamera, Camera * pLeftCamera, 
 					Camera * pBackCamera, Camera * pRightCamera);
 
-	//Generate one surround view image
+	//Generate one surround view image.
 	cv::Mat GenerateSurroundView(int nIndex, int nRows, int nCols);
+	//Generate one birds-eye view image.
+	cv::Mat GenerateBirdsView(int nIndex, int nCamera, int nRows, int nCols);
 	//Init the K_G matrix.
 	bool InitK_G(int nRows, int nCols, float nDx, float nDy);
 
 	//Bind the image pairs, equal to a setter.
 	bool BindImagePairs(vector<SVPair> gDistortedPairs);
+
+	bool GetUndistortedROI(int nIndex, int nCameraIndex, cv::Mat & mROI_Left, cv::Mat & mROI_Right,
+							vector<int> & gROI_Left , vector<int> & gROI_Right);
+
+	// bool OptimizePoseWithOneFrame(int nIndex){
+	// 	//Generate birds-eye view image.
+	// 	//Useless.
+	// 	cv::Mat mSurroundView_Front = GenerateBirdsView(nIndex, 0,  1000, 1000);
+	// 	cv::Mat mSurroundView_Left = GenerateBirdsView(nIndex, 1,  1000, 1000);
+	// 	cv::Mat mSurroundView_Back = GenerateBirdsView(nIndex, 2,  1000, 1000);
+	// 	cv::Mat mSurroundView_Right = GenerateBirdsView(nIndex, 3,  1000, 1000);
+
+	// }
 
 
 	//Cameras in the surround-view system.
@@ -52,6 +68,12 @@ public:
 
 	//The converter matrix from ground coordinate to surround-view coordinate.
 	cv::Mat m_mK_G;
+
+	//ROI of 4 overlapping region.
+	cv::Rect m_iROI_FL;
+	cv::Rect m_iROI_LB;
+	cv::Rect m_iROI_BR;
+	cv::Rect m_iROI_RF;
 
 	vector<SVPair> m_gDistortedPairs;
 	
