@@ -22,7 +22,7 @@ int main(){
 						pRightCamera);
 
 	cout << "Load pairs" << endl;
-	vector<SVPair> gPairs = iLoader.LoadFramePairs(vector<int>{0 , 1 , 2});
+	vector<SVPair> gPairs = iLoader.LoadFramePairs(vector<int>{0 , 1 , 2 , 3});
 
 	SurroundView iSurround(pFrontCamera, pLeftCamera, pBackCamera, pRightCamera);
 
@@ -39,15 +39,11 @@ int main(){
 	cv::imshow("const cv::String &winname", mSurroundView);
 	cv::waitKey(0);
 
-	// cv::Mat mROI_Left, mROI_Right;
-	// vector<int> gROI_Left, gROI_Right;
-	// iSurround.GetUndistortedROI(0, 1, mROI_Left, mROI_Right, gROI_Left, gROI_Right);
-	// cv::imshow("left", mROI_Left);
-	// cv::imshow("right", mROI_Right);
-	// cv::waitKey(0);
-
-
 	iSurround.OptimizePoseWithOneFrame(0);
+
+	mSurroundView = iSurround.GenerateSurroundView(2, 1000, 1000);
+	cv::imshow("const cv::String &winname", mSurroundView);
+	cv::waitKey(0);
 
 
 	return 0;

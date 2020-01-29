@@ -50,7 +50,7 @@ class DirectUnaryEdge : public g2o::BaseUnaryEdge<1 , double , g2o::VertexSE3Exp
                 _error(0 , 0) = 0.0;
                 this->setLevel(1);
             }else{
-                _error(0 , 0) = this->getPixelValue(nU, nV);
+                _error(0 , 0) = this->getPixelValue(nU, nV) - _measurement;
             }
         }
 
@@ -99,7 +99,7 @@ class DirectUnaryEdge : public g2o::BaseUnaryEdge<1 , double , g2o::VertexSE3Exp
             _jacobianOplusXi = jacobian_pixel_uv * jacobian_uv_ksai;
         }
 
-        virtual bool read(std::istream in) {}
+        virtual bool read(std::istream& in) {}
         virtual bool write(std::ostream & out) const {}
 
     private:

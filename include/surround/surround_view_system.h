@@ -52,41 +52,7 @@ public:
 
 
 
-	bool OptimizePoseWithOneFrame(int nIndex){
-		//Generate birds-eye view image.
-		//Useless.
-		cv::Mat mSurroundView_Front = GenerateBirdsView(nIndex, 0,  1000, 1000);
-		cv::Mat mSurroundView_Left = GenerateBirdsView(nIndex, 1,  1000, 1000);
-		cv::Mat mSurroundView_Back = GenerateBirdsView(nIndex, 2,  1000, 1000);
-		cv::Mat mSurroundView_Right = GenerateBirdsView(nIndex, 3,  1000, 1000);
-
-		//Now use the point on the ground to construct the optimization structure.
-		//Firstly use the left view to test.
-		cv::Mat mROI_FL, mROI_LB;
-		vector<int> gROI_FL, gROI_LB;
-		//Get the ROI.
-		GetUndistortedROI(nIndex, 1, mROI_FL, mROI_LB, gROI_FL, gROI_LB);
-
-		//Used to transfer surround-view coordinate to ground coordinate
-		cv::Mat mK_G_inv = this->m_mK_G.inv();
-		cv::Mat mK_G_Augment;
-		cv::vconcat( mK_G_inv.rowRange(0 , 2) , cv::Mat::zeros(1 , 3 , CV_64FC1) , mK_G_Augment);
-		cv::vconcat( mK_G_Augment , mK_G_inv.rowRange(2 , 3) , mK_G_Augment);
-
-
-		for (int u=0;u<m_iROI_FL.width;u++){
-			for (int v=0;v<m_iROI_FL.height;v++){
-				//Get the surround-view coordinate of the point.
-				int nU = u + m_iROI_FL.x;
-				int nV = v + m_iROI_FL.y;
-				cv::Mat mp_surround = (cv::Mat_<double>(3 , 1) << nU, nV, 1);
-				//Convert surround-view coordinate to ground coordinate.
-				cv::Mat mP_G = mK_G_Augment * mp_surround;
-				
-			}		
-		}
-
-	}
+	bool OptimizePoseWithOneFrame(int nIndex);
 
 
 	//Cameras in the surround-view system.
