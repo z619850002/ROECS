@@ -23,6 +23,7 @@ using namespace std;
 
 
 //This is the unary edge, the photometric coefficient is ignored.
+//In this edge, the depth of the point is not optimized.
 class DirectUnaryEdge : public g2o::BaseUnaryEdge<1 , double , g2o::VertexSE3Expmap>{
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
