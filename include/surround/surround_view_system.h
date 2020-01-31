@@ -26,6 +26,7 @@
 #include "../camera/camera.h"
 #include "../frame/frame_pair.h"
 #include "../optimizer/direct_unary_edge.h"
+#include "../../include/optimizer/surround_optimizer.h"
 using namespace std;
 
 class SurroundView
@@ -50,6 +51,10 @@ public:
 							vector<int> & gROI_Left , vector<int> & gROI_Right);
 
 
+	bool AddEdge(int nIndex, int nCameraIndex,
+							vector<cv::Mat> & gSurroundViews,
+							cv::Mat & mGrayROI_Right,
+							cv::Mat & mGrayROI_Left);
 
 
 	bool OptimizePoseWithOneFrame(int nIndex);
@@ -71,6 +76,8 @@ public:
 	cv::Rect m_iROI_RF;
 
 	vector<SVPair> m_gDistortedPairs;
+
+	SurroundOptimizer * m_pOptimizer;
 	
 };
 

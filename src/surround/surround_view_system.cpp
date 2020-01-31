@@ -1,7 +1,7 @@
 #include "../../include/surround/surround_view_system.h"
 #include "utils.h"
 #include "../../include/optimizer/direct_unary_edge.h"
-
+#include "../../include/optimizer/surround_optimizer.h"
 using namespace std;
 
 
@@ -35,6 +35,13 @@ SurroundView::SurroundView(){
 	this->m_iROI_LB = cv::Rect(ROI_LB_x,ROI_LB_y-100,ROI_LB_w,ROI_LB_h+70);
 	this->m_iROI_BR = cv::Rect(ROI_BR_x,ROI_BR_y-100,ROI_BR_w,ROI_BR_h+70);
 	this->m_iROI_RF = cv::Rect(ROI_RF_x,ROI_RF_y,ROI_RF_w,ROI_RF_h+70);
+
+	// //Initialize optimizer.
+	// this->m_pOptimizer = new SurroundOptimizer(
+	// 	this->m_pFrontCamera,
+	// 	this->m_pLeftCamera,
+	// 	this->m_pBackCamera,
+	// 	this->m_pRightCamera);
 
 }
 
@@ -71,6 +78,13 @@ SurroundView::SurroundView(	Camera * pFrontCamera, Camera * pLeftCamera,
 	this->m_iROI_LB = cv::Rect(ROI_LB_x,ROI_LB_y-100,ROI_LB_w,ROI_LB_h+70);
 	this->m_iROI_BR = cv::Rect(ROI_BR_x,ROI_BR_y-100,ROI_BR_w,ROI_BR_h+70);
 	this->m_iROI_RF = cv::Rect(ROI_RF_x,ROI_RF_y,ROI_RF_w,ROI_RF_h+70);
+
+
+	this->m_pOptimizer = new SurroundOptimizer(
+		this->m_pFrontCamera,
+		this->m_pLeftCamera,
+		this->m_pBackCamera,
+		this->m_pRightCamera);
 	
 }
 
@@ -114,10 +128,6 @@ bool SurroundView::GetUndistortedROI(int nIndex, int nCameraIndex, cv::Mat & mRO
 	CalculateROI(mOriginalImage, mROI_Left, mK, mD, pCamera->m_mT, this->m_mK_G,
 				 iRectLeft.x, iRectLeft.y, iRectLeft.width, iRectLeft.height,
 				 gROI_Left);
-	cout << "ROI left is " << endl;
-	for (auto item : gROI_Left){
-		cout << item << endl;
-	}
 
 
 	CalculateROI(mOriginalImage, mROI_Right, mK, mD, pCamera->m_mT, this->m_mK_G,
@@ -251,6 +261,330 @@ bool SurroundView::BindImagePairs(vector<SVPair> gDistortedPairs){
 }
 
 
+// Add edges of the optimization in one frame for one camera.
+// nIndex : the index of the frame chosen in optimization
+// nCameraIndex : the camera want to be optimized
+bool SurroundView::AddEdge(int nIndex, int nCameraIndex,
+							vector<cv::Mat> & gSurroundViews,
+							cv::Mat & mGrayROI_Right,
+							cv::Mat & mGrayROI_Left){
+	cv::Mat mSurroundView_Right, mSurroundView_Left, mSurroundView;
+	vector<int> gRightIndex = {3,0,1,2};
+	vector<int> gLeftIndex = {1,2,3,0};
+	int nRightIndex = gRightIndex[nCameraIndex];
+	int nLeftIndex = gLeftIndex[nCameraIndex];
+
+	//Used to transfer surround-view coordinate to ground coordinate
+	cv::Mat mK_G_inv = this->m_mK_G.inv();
+	cv::Mat mK_G_Augment;
+	cv::vconcat( mK_G_inv.rowRange(0 , 2) , cv::Mat::zeros(1 , 3 , CV_64FC1) , mK_G_Augment);
+	cv::vconcat( mK_G_Augment , mK_G_inv.rowRange(2 , 3) , mK_G_Augment);
+
+	//Generate ROI on original images.
+	cv::Mat mOriginROI_Right, mOriginROI_Left;
+	vector<int> gOriginROI_Right, gOriginROI_Left;
+	//Get the ROI on original image.
+	GetUndistortedROI(	nIndex, nCameraIndex, mOriginROI_Right, mOriginROI_Left,
+					 	gOriginROI_Right, gOriginROI_Left);
+
+	//Construct gray image.
+    // cv::Mat mGrayROI_Right , mGrayROI_Left;
+    cv::cvtColor(mOriginROI_Right,mGrayROI_Right,cv::COLOR_BGR2GRAY);
+    cv::cvtColor(mOriginROI_Left, mGrayROI_Left, cv::COLOR_BGR2GRAY);
+
+
+    //Add edges.
+	//The depth is fixed now.
+	//First measurement ROI
+    //Get 2 ROI.
+    vector<cv::Rect> gLeftROIs = {m_iROI_RF, m_iROI_FL, m_iROI_LB, m_iROI_BR};
+	vector<cv::Rect> gRightROIs = {m_iROI_FL, m_iROI_LB, m_iROI_BR, m_iROI_RF};
+	cv::Rect iLeftROI = gLeftROIs[nLeftIndex];
+	cv::Rect iRightROI = gRightROIs[nRightIndex];
+
+	cv::Mat mMeasurementROI_Right = gSurroundViews[nRightIndex](iRightROI);
+	cv::Mat mMeasurementROI_Left = gSurroundViews[nLeftIndex](iLeftROI);
+	cv::Mat mMeasurementGray_Right , mMeasurementGray_Left;
+    cv::cvtColor(mMeasurementROI_Right, mMeasurementGray_Right, cv::COLOR_BGR2GRAY);
+	cv::cvtColor(mMeasurementROI_Left, mMeasurementGray_Left, cv::COLOR_BGR2GRAY);
+	mMeasurementGray_Right.convertTo(mMeasurementGray_Right, CV_64FC1);
+	mMeasurementGray_Left.convertTo(mMeasurementGray_Left, CV_64FC1);
+
+	//The ROI on birds-eye view of this camera.
+	//Used in computing the coef.
+	//Get the ROI.
+	cv::Mat mBirdseyeROI_Right = gSurroundViews[nCameraIndex](iRightROI);
+	cv::Mat mBirdseyeROI_Left = gSurroundViews[nCameraIndex](iLeftROI);
+	//Convert to grayscale.
+	cv::Mat mBirdseyeGray_Right, mBirdseyeGray_Left;
+    cv::cvtColor(mBirdseyeROI_Right, mBirdseyeGray_Right, cv::COLOR_BGR2GRAY);
+	cv::cvtColor(mBirdseyeROI_Left, mBirdseyeGray_Left, cv::COLOR_BGR2GRAY);
+	mBirdseyeGray_Right.convertTo(mBirdseyeGray_Right, CV_64FC1);
+	mBirdseyeGray_Left.convertTo(mBirdseyeGray_Left, CV_64FC1);
+
+	//Get the coef to eliminate the affect of exposure time.
+	double nCoef_Right = cv::mean(mBirdseyeGray_Right).val[0]/cv::mean(mMeasurementGray_Right).val[0];
+	double nCoef_Left = cv::mean(mBirdseyeGray_Left).val[0]/cv::mean(mMeasurementGray_Left).val[0];
+
+	//Add edges in the right region.
+	for (int u=0;u<iRightROI.width;u++){
+		for (int v=0;v<iRightROI.height;v++){
+			//Get the surround-view coordinate of the point.
+			int nU = u + iRightROI.x;
+			int nV = v + iRightROI.y;
+			cv::Mat mp_surround = (cv::Mat_<double>(3 , 1) << nU, nV, 1);
+			//Convert surround-view coordinate to ground coordinate.
+			cv::Mat mP_G = mK_G_Augment * mp_surround;
+
+
+            Eigen::Vector3d mPoint3d(mP_G.at<double>(0 , 0),
+            						 mP_G.at<double>(1 , 0),
+            						 mP_G.at<double>(2 , 0));
+
+
+            double x = mPoint3d[0];
+            double y = mPoint3d[1];
+            double z = mPoint3d[2];
+
+            vector<Camera *> gpCameras = {
+            	this->m_pFrontCamera,
+            	this->m_pLeftCamera,
+            	this->m_pBackCamera,
+            	this->m_pRightCamera
+            };
+
+            // Camera * pCamera = gpCameras[nCameraIndex];
+
+            // //Get the intrinsics.
+            // double nFx = pCamera->m_mK(0 , 0);
+            // double nFy = pCamera->m_mK(1 , 1);
+            // double nCx = pCamera->m_mK(0 , 2) - gOriginROI_Right[0];
+            // double nCy = pCamera->m_mK(1 , 2) - gOriginROI_Right[1];
+
+            // Eigen::Vector3d mPoint_Camera = this->m_pOptimizer->m_pPoseLeft->estimate().map(mPoint3d);
+
+            // float uu = mPoint_Camera[0] * nFx / mPoint_Camera[2] + nCx;
+            // float vv = mPoint_Camera[1] * nFy / mPoint_Camera[2] + nCy;
+
+
+
+            // if (uu < 0 || uu >=mGrayROI_Right.cols || vv < 0 || vv>=mGrayROI_Right.rows){
+            // 	cout << "u,v is " << uu << " " << vv << endl;
+            // 	cout << "nCx is " << nCx << endl;
+            // 	cout << "Point3d is " << endl << mPoint_Camera << endl;
+            // 	cout << "mK_G_Augment is " << endl << mK_G_Augment << endl;
+            // }
+ 
+
+
+
+            double nMeasurement = mMeasurementGray_Right.at<double>(v , u) * nCoef_Right;
+            this->m_pOptimizer->AddEdge(
+            	mPoint3d,
+            	nCameraIndex,
+            	gOriginROI_Right,
+            	nMeasurement,
+            	&mGrayROI_Right);
+		}		
+	}
+
+	//Add edges in the left region.
+	for (int u=0;u<iLeftROI.width;u++){
+		for (int v=0;v<iLeftROI.height;v++){
+			//Get the surround-view coordinate of the point.
+			int nU = u + iLeftROI.x;
+			int nV = v + iLeftROI.y;
+			cv::Mat mp_surround = (cv::Mat_<double>(3 , 1) << nU, nV, 1);
+			//Convert surround-view coordinate to ground coordinate.
+			cv::Mat mP_G = mK_G_Augment * mp_surround;
+
+
+            Eigen::Vector3d mPoint3d(mP_G.at<double>(0 , 0),
+            						 mP_G.at<double>(1 , 0),
+            						 mP_G.at<double>(2 , 0));
+
+            double nMeasurement = mMeasurementGray_Left.at<double>(v , u) * nCoef_Left;
+            this->m_pOptimizer->AddEdge(
+            	mPoint3d,
+            	nCameraIndex,
+            	gOriginROI_Left,
+            	nMeasurement,
+            	&mGrayROI_Left);
+		}		
+	}	
+}
+
+
+// bool SurroundView::OptimizePoseWithOneFrame(int nIndex){
+// 	//Generate birds-eye view image.
+// 	//Useless.
+// 	cv::Mat mSurroundView_Front = GenerateBirdsView(nIndex, 0,  1000, 1000);
+// 	cv::Mat mSurroundView_Left = GenerateBirdsView(nIndex, 1,  1000, 1000);
+// 	cv::Mat mSurroundView_Back = GenerateBirdsView(nIndex, 2,  1000, 1000);
+// 	cv::Mat mSurroundView_Right = GenerateBirdsView(nIndex, 3,  1000, 1000);
+
+// 	//Now use the point on the ground to construct the optimization structure.
+// 	//Firstly use the left view to test.
+// 	cv::Mat mROI_FL, mROI_LB;
+// 	vector<int> gROI_FL, gROI_LB;
+// 	//Get the ROI.
+// 	GetUndistortedROI(nIndex, 1, mROI_FL, mROI_LB, gROI_FL, gROI_LB);
+
+// 	//Used to transfer surround-view coordinate to ground coordinate
+// 	cv::Mat mK_G_inv = this->m_mK_G.inv();
+// 	cv::Mat mK_G_Augment;
+// 	cv::vconcat( mK_G_inv.rowRange(0 , 2) , cv::Mat::zeros(1 , 3 , CV_64FC1) , mK_G_Augment);
+// 	cv::vconcat( mK_G_Augment , mK_G_inv.rowRange(2 , 3) , mK_G_Augment);
+
+// 	//Construct gray image.
+//     cv::Mat mGrayROI_FL , mGrayROI_LB;
+//     cv::cvtColor(mROI_FL,mGrayROI_FL,cv::COLOR_BGR2GRAY);
+//     cv::cvtColor(mROI_LB, mGrayROI_LB, cv::COLOR_BGR2GRAY);
+
+// 	//Construct the optimizer.
+//     //Now we use Levenberg solver. GN,LM,Dogleg is also avaliable.
+//     typedef g2o::BlockSolver<g2o::BlockSolverTraits<6,1>> DirectBlock;  // 求解的向量是6＊1的
+//     std::unique_ptr<DirectBlock::LinearSolverType> linearSolver (new g2o::LinearSolverDense< DirectBlock::PoseMatrixType > ());
+//     std::unique_ptr<DirectBlock> solver_ptr (new DirectBlock ( std::move(linearSolver) ));
+//     // g2o::OptimizationAlgorithmGaussNewton* solver = new g2o::OptimizationAlgorithmGaussNewton( solver_ptr ); // G-N
+//     g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg ( std::move(solver_ptr) ); // L-M
+//     g2o::SparseOptimizer optimizer;
+//     optimizer.setAlgorithm ( solver );
+//     optimizer.setVerbose( true );
+
+//     // Vertex of pose.
+//     cout << "Add pose vertex" << endl;
+//     g2o::VertexSE3Expmap* pPose = new g2o::VertexSE3Expmap();
+//     pPose->setEstimate ( g2o::SE3Quat ( m_pLeftCamera->m_mT.rotation_matrix() ,
+//     								   m_pLeftCamera->m_mT.translation() ));
+
+//     cout << "Rotation is " << endl << m_pLeftCamera->m_mT.rotation_matrix() << endl;
+//     cout << "Translation is " << endl << m_pLeftCamera->m_mT.translation() << endl;
+
+//     pPose->setId ( 0 );
+//     optimizer.addVertex ( pPose );
+
+
+//     cout << "Add edges." << endl;
+// 	//Front-left points.
+// 	//The depth is fixed now.
+//     cv::Mat mFrontROI_FL = mSurroundView_Front(m_iROI_FL);
+//     cv::cvtColor(mFrontROI_FL, mFrontROI_FL, cv::COLOR_BGR2GRAY);
+// 	cv::Mat mLeftROI_FL = mSurroundView_Left(m_iROI_FL);
+// 	cv::cvtColor(mLeftROI_FL, mLeftROI_FL, cv::COLOR_BGR2GRAY);
+// 	mFrontROI_FL.convertTo(mFrontROI_FL, CV_64FC1);
+// 	mLeftROI_FL.convertTo(mLeftROI_FL, CV_64FC1);
+// 	//Get the coef to eliminate the affect of exposure time.
+// 	double nCoef = cv::mean(mLeftROI_FL).val[0]/cv::mean(mFrontROI_FL).val[0];
+
+// 	int nEdgeID = 1;
+
+// 	for (int u=0;u<m_iROI_FL.width;u++){
+// 		for (int v=0;v<m_iROI_FL.height;v++){
+// 			//Get the surround-view coordinate of the point.
+// 			int nU = u + m_iROI_FL.x;
+// 			int nV = v + m_iROI_FL.y;
+// 			cv::Mat mp_surround = (cv::Mat_<double>(3 , 1) << nU, nV, 1);
+// 			//Convert surround-view coordinate to ground coordinate.
+// 			cv::Mat mP_G = mK_G_Augment * mp_surround;
+
+
+//             Eigen::Vector3d mPoint3d(mP_G.at<double>(0 , 0),
+//             						 mP_G.at<double>(1 , 0),
+//             						 mP_G.at<double>(2 , 0));
+
+
+//             double nFx, nFy, nCx, nCy;
+//             nFx = m_pLeftCamera->m_mK(0 , 0);
+//             nFy = m_pLeftCamera->m_mK(1 , 1);
+//             nCx = m_pLeftCamera->m_mK(0 , 2) - gROI_FL[0];
+//             nCy = m_pLeftCamera->m_mK(1 , 2) - gROI_FL[1];
+
+// 			DirectUnaryEdge* pEdge = new DirectUnaryEdge (
+// 	            mPoint3d,
+// 	            nFx,
+// 	            nFy,
+// 	            nCx,
+// 	            nCy,
+// 	            &mGrayROI_FL
+// 	        );
+
+// 	        pEdge->setVertex ( 0, pPose );
+// 	        //TODO: The measurement needs to be obtained.
+// 	        double nMeasurement = mFrontROI_FL.at<double>(v , u) * nCoef;
+// 	        pEdge->setMeasurement (nMeasurement);
+// 	        pEdge->setInformation ( Eigen::Matrix<double,1,1>::Identity() );
+// 	        pEdge->setId ( nEdgeID++ );
+// 	        optimizer.addEdge ( pEdge );
+// 		}		
+// 	}
+
+
+// 	cv::Mat mBackROI_LB = mSurroundView_Back(m_iROI_LB);
+//     cv::cvtColor(mBackROI_LB, mBackROI_LB, cv::COLOR_BGR2GRAY);
+// 	cv::Mat mLeftROI_LB = mSurroundView_Left(m_iROI_LB);
+// 	cv::cvtColor(mLeftROI_LB, mLeftROI_LB, cv::COLOR_BGR2GRAY);
+// 	mLeftROI_LB.convertTo(mLeftROI_LB, CV_64FC1);
+// 	mBackROI_LB.convertTo(mBackROI_LB, CV_64FC1);
+// 	//Get the coef to eliminate the affect of exposure time.
+// 	double nCoef2 = cv::mean(mLeftROI_LB).val[0]/cv::mean(mBackROI_LB).val[0];
+
+// 	for (int u=0;u<m_iROI_LB.width;u++){
+// 		for (int v=0;v<m_iROI_LB.height;v++){
+// 			//Get the surround-view coordinate of the point.
+// 			int nU = u + m_iROI_LB.x;
+// 			int nV = v + m_iROI_LB.y;
+// 			cv::Mat mp_surround = (cv::Mat_<double>(3 , 1) << nU, nV, 1);
+// 			//Convert surround-view coordinate to ground coordinate.
+// 			cv::Mat mP_G = mK_G_Augment * mp_surround;
+
+
+//             Eigen::Vector3d mPoint3d(mP_G.at<double>(0 , 0),
+//             						 mP_G.at<double>(1 , 0),
+//             						 mP_G.at<double>(2 , 0));
+
+
+//             double nFx, nFy, nCx, nCy;
+//             nFx = m_pLeftCamera->m_mK(0 , 0);
+//             nFy = m_pLeftCamera->m_mK(1 , 1);
+//             nCx = m_pLeftCamera->m_mK(0 , 2) - gROI_LB[0];
+//             nCy = m_pLeftCamera->m_mK(1 , 2) - gROI_LB[1];
+
+// 			DirectUnaryEdge* pEdge = new DirectUnaryEdge (
+// 	            mPoint3d,
+// 	            nFx,
+// 	            nFy,
+// 	            nCx,
+// 	            nCy,
+// 	            &mGrayROI_LB
+// 	        );
+
+
+// 	        pEdge->setVertex ( 0, pPose );
+// 	        //TODO: The measurement needs to be obtained.
+// 	        double nMeasurement = mBackROI_LB.at<double>(v , u) * nCoef2;
+
+// 	        pEdge->setMeasurement (nMeasurement);
+// 	        pEdge->setInformation ( Eigen::Matrix<double,1,1>::Identity() );
+// 	        pEdge->setId ( nEdgeID++ );
+// 	        optimizer.addEdge ( pEdge );
+// 		}		
+// 	}
+
+// 	//Begin to optimize.
+// 	cout<<"edges in graph: "<<optimizer.edges().size() <<endl;
+//     optimizer.initializeOptimization();
+//     optimizer.optimize ( 100 );
+//     cout << "Before optimization, pose is " << endl << m_pLeftCamera->m_mT.matrix() << endl;
+//     cout << "After optimiztion, pose is " << endl << pPose->estimate() << endl;
+
+//     Eigen::Isometry3d mTcw = pPose->estimate();
+//     m_pLeftCamera->m_mT = Sophus::SE3(mTcw.rotation() , mTcw.translation());
+
+// }
+
+
+
 
 bool SurroundView::OptimizePoseWithOneFrame(int nIndex){
 	//Generate birds-eye view image.
@@ -260,162 +594,18 @@ bool SurroundView::OptimizePoseWithOneFrame(int nIndex){
 	cv::Mat mSurroundView_Back = GenerateBirdsView(nIndex, 2,  1000, 1000);
 	cv::Mat mSurroundView_Right = GenerateBirdsView(nIndex, 3,  1000, 1000);
 
-	//Now use the point on the ground to construct the optimization structure.
-	//Firstly use the left view to test.
-	cv::Mat mROI_FL, mROI_LB;
-	vector<int> gROI_FL, gROI_LB;
-	//Get the ROI.
-	GetUndistortedROI(nIndex, 1, mROI_FL, mROI_LB, gROI_FL, gROI_LB);
+	vector<cv::Mat> gSurroundViews = {
+		mSurroundView_Front,
+		mSurroundView_Left,
+		mSurroundView_Back,
+		mSurroundView_Right
+	};
 
-	//Used to transfer surround-view coordinate to ground coordinate
-	cv::Mat mK_G_inv = this->m_mK_G.inv();
-	cv::Mat mK_G_Augment;
-	cv::vconcat( mK_G_inv.rowRange(0 , 2) , cv::Mat::zeros(1 , 3 , CV_64FC1) , mK_G_Augment);
-	cv::vconcat( mK_G_Augment , mK_G_inv.rowRange(2 , 3) , mK_G_Augment);
+	cv::Mat mGrayROI_Right,mGrayROI_Left;
+	cv::Mat mGrayROI_Right2,mGrayROI_Left2;
+	this->AddEdge(nIndex, 1, gSurroundViews, mGrayROI_Right, mGrayROI_Left);
+	this->AddEdge(nIndex, 3, gSurroundViews, mGrayROI_Right2, mGrayROI_Left2);
+	// cout << "mGrayROI_Right size " << endl << mGrayROI_Right.rows << "*" << mGrayROI_Right.cols << endl; 
 
-	//Construct gray image.
-    cv::Mat mGrayROI_FL , mGrayROI_LB;
-    cv::cvtColor(mROI_FL,mGrayROI_FL,cv::COLOR_BGR2GRAY);
-    cv::cvtColor(mROI_LB, mGrayROI_LB, cv::COLOR_BGR2GRAY);
-
-	//Construct the optimizer.
-    //Now we use Levenberg solver. GN,LM,Dogleg is also avaliable.
-    typedef g2o::BlockSolver<g2o::BlockSolverTraits<6,1>> DirectBlock;  // 求解的向量是6＊1的
-    std::unique_ptr<DirectBlock::LinearSolverType> linearSolver (new g2o::LinearSolverDense< DirectBlock::PoseMatrixType > ());
-    std::unique_ptr<DirectBlock> solver_ptr (new DirectBlock ( std::move(linearSolver) ));
-    // g2o::OptimizationAlgorithmGaussNewton* solver = new g2o::OptimizationAlgorithmGaussNewton( solver_ptr ); // G-N
-    g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg ( std::move(solver_ptr) ); // L-M
-    g2o::SparseOptimizer optimizer;
-    optimizer.setAlgorithm ( solver );
-    optimizer.setVerbose( true );
-
-    // Vertex of pose.
-    cout << "Add pose vertex" << endl;
-    g2o::VertexSE3Expmap* pPose = new g2o::VertexSE3Expmap();
-    pPose->setEstimate ( g2o::SE3Quat ( m_pLeftCamera->m_mT.rotation_matrix() ,
-    								   m_pLeftCamera->m_mT.translation() ));
-
-    cout << "Rotation is " << endl << m_pLeftCamera->m_mT.rotation_matrix() << endl;
-    cout << "Translation is " << endl << m_pLeftCamera->m_mT.translation() << endl;
-
-    pPose->setId ( 0 );
-    optimizer.addVertex ( pPose );
-
-
-    cout << "Add edges." << endl;
-	//Front-left points.
-	//The depth is fixed now.
-    cv::Mat mFrontROI_FL = mSurroundView_Front(m_iROI_FL);
-    cv::cvtColor(mFrontROI_FL, mFrontROI_FL, cv::COLOR_BGR2GRAY);
-	cv::Mat mLeftROI_FL = mSurroundView_Left(m_iROI_FL);
-	cv::cvtColor(mLeftROI_FL, mLeftROI_FL, cv::COLOR_BGR2GRAY);
-	mFrontROI_FL.convertTo(mFrontROI_FL, CV_64FC1);
-	mLeftROI_FL.convertTo(mLeftROI_FL, CV_64FC1);
-	//Get the coef to eliminate the affect of exposure time.
-	double nCoef = cv::mean(mLeftROI_FL).val[0]/cv::mean(mFrontROI_FL).val[0];
-
-	int nEdgeID = 1;
-
-	for (int u=0;u<m_iROI_FL.width;u++){
-		for (int v=0;v<m_iROI_FL.height;v++){
-			//Get the surround-view coordinate of the point.
-			int nU = u + m_iROI_FL.x;
-			int nV = v + m_iROI_FL.y;
-			cv::Mat mp_surround = (cv::Mat_<double>(3 , 1) << nU, nV, 1);
-			//Convert surround-view coordinate to ground coordinate.
-			cv::Mat mP_G = mK_G_Augment * mp_surround;
-
-
-            Eigen::Vector3d mPoint3d(mP_G.at<double>(0 , 0),
-            						 mP_G.at<double>(1 , 0),
-            						 mP_G.at<double>(2 , 0));
-
-
-            double nFx, nFy, nCx, nCy;
-            nFx = m_pLeftCamera->m_mK(0 , 0);
-            nFy = m_pLeftCamera->m_mK(1 , 1);
-            nCx = m_pLeftCamera->m_mK(0 , 2) - gROI_FL[0];
-            nCy = m_pLeftCamera->m_mK(1 , 2) - gROI_FL[1];
-
-			DirectUnaryEdge* pEdge = new DirectUnaryEdge (
-	            mPoint3d,
-	            nFx,
-	            nFy,
-	            nCx,
-	            nCy,
-	            &mGrayROI_FL
-	        );
-
-	        pEdge->setVertex ( 0, pPose );
-	        //TODO: The measurement needs to be obtained.
-	        double nMeasurement = mFrontROI_FL.at<double>(v , u) * nCoef;
-	        pEdge->setMeasurement (nMeasurement);
-	        pEdge->setInformation ( Eigen::Matrix<double,1,1>::Identity() );
-	        pEdge->setId ( nEdgeID++ );
-	        optimizer.addEdge ( pEdge );
-		}		
-	}
-
-
-	cv::Mat mBackROI_LB = mSurroundView_Back(m_iROI_LB);
-    cv::cvtColor(mBackROI_LB, mBackROI_LB, cv::COLOR_BGR2GRAY);
-	cv::Mat mLeftROI_LB = mSurroundView_Left(m_iROI_LB);
-	cv::cvtColor(mLeftROI_LB, mLeftROI_LB, cv::COLOR_BGR2GRAY);
-	mLeftROI_LB.convertTo(mLeftROI_LB, CV_64FC1);
-	mBackROI_LB.convertTo(mBackROI_LB, CV_64FC1);
-	//Get the coef to eliminate the affect of exposure time.
-	double nCoef2 = cv::mean(mLeftROI_LB).val[0]/cv::mean(mBackROI_LB).val[0];
-
-	for (int u=0;u<m_iROI_LB.width;u++){
-		for (int v=0;v<m_iROI_LB.height;v++){
-			//Get the surround-view coordinate of the point.
-			int nU = u + m_iROI_LB.x;
-			int nV = v + m_iROI_LB.y;
-			cv::Mat mp_surround = (cv::Mat_<double>(3 , 1) << nU, nV, 1);
-			//Convert surround-view coordinate to ground coordinate.
-			cv::Mat mP_G = mK_G_Augment * mp_surround;
-
-
-            Eigen::Vector3d mPoint3d(mP_G.at<double>(0 , 0),
-            						 mP_G.at<double>(1 , 0),
-            						 mP_G.at<double>(2 , 0));
-
-
-            double nFx, nFy, nCx, nCy;
-            nFx = m_pLeftCamera->m_mK(0 , 0);
-            nFy = m_pLeftCamera->m_mK(1 , 1);
-            nCx = m_pLeftCamera->m_mK(0 , 2) - gROI_LB[0];
-            nCy = m_pLeftCamera->m_mK(1 , 2) - gROI_LB[1];
-
-			DirectUnaryEdge* pEdge = new DirectUnaryEdge (
-	            mPoint3d,
-	            nFx,
-	            nFy,
-	            nCx,
-	            nCy,
-	            &mGrayROI_LB
-	        );
-
-
-	        pEdge->setVertex ( 0, pPose );
-	        //TODO: The measurement needs to be obtained.
-	        double nMeasurement = mBackROI_LB.at<double>(v , u) * nCoef2;
-
-	        pEdge->setMeasurement (nMeasurement);
-	        pEdge->setInformation ( Eigen::Matrix<double,1,1>::Identity() );
-	        pEdge->setId ( nEdgeID++ );
-	        optimizer.addEdge ( pEdge );
-		}		
-	}
-
-	//Begin to optimize.
-	cout<<"edges in graph: "<<optimizer.edges().size() <<endl;
-    optimizer.initializeOptimization();
-    optimizer.optimize ( 100 );
-    cout << "Before optimization, pose is " << endl << m_pLeftCamera->m_mT.matrix() << endl;
-    cout << "After optimiztion, pose is " << endl << pPose->estimate() << endl;
-
-    Eigen::Isometry3d mTcw = pPose->estimate();
-    m_pLeftCamera->m_mT = Sophus::SE3(mTcw.rotation() , mTcw.translation());
-
+	this->m_pOptimizer->Optimize();
 }

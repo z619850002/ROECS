@@ -34,7 +34,8 @@ class DirectUnaryEdge : public g2o::BaseUnaryEdge<1 , double , g2o::VertexSE3Exp
         DirectUnaryEdge(Eigen::Vector3d mPoint3d , float nFx , float nFy , 
                         float nCx , float nCy , cv::Mat * pImage):
                         m_mPoint3d(mPoint3d), m_nFx(nFx), m_nFy(nFy),
-                        m_nCx(nCx), m_nCy(nCy), m_pImage(pImage){}
+                        m_nCx(nCx), m_nCy(nCy), m_pImage(pImage){
+                        }
 
         virtual void computeError(){
             //Get the vertex.
@@ -91,7 +92,6 @@ class DirectUnaryEdge : public g2o::BaseUnaryEdge<1 , double , g2o::VertexSE3Exp
             jacobian_uv_ksai(1 , 5) = -y / (z*z) * m_nFy;
 
             Eigen::Matrix<double , 1 , 2> jacobian_pixel_uv;
-
             jacobian_pixel_uv(0 , 0) = (getPixelValue(u+1, v) - getPixelValue(u-1, v))/2;
 
             jacobian_pixel_uv(0 , 1) = (getPixelValue(u, v+1) - getPixelValue(u, v-1))/2;
@@ -107,12 +107,13 @@ class DirectUnaryEdge : public g2o::BaseUnaryEdge<1 , double , g2o::VertexSE3Exp
             uchar* data = & m_pImage->data[ int ( y ) * m_pImage->step + int ( x ) ];
             float xx = x - floor ( x );
             float yy = y - floor ( y );
-            return float (
+            float result = float (
                        ( 1-xx ) * ( 1-yy ) * data[0] +
                        xx* ( 1-yy ) * data[1] +
                        ( 1-xx ) *yy*data[ m_pImage->step ] +
                        xx*yy*data[m_pImage->step+1]
                    );
+            return result;
         }
 
 

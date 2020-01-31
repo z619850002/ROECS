@@ -17,6 +17,10 @@ int main(){
 									pRightCamera);
 
 
+	pLeftCamera->BlurPose();
+	pRightCamera->BlurPose();
+
+
 	FrameLoader iLoader("/home/kyrie/Documents/Data/1216" , pFrontCamera,
 						pLeftCamera, pBackCamera, 
 						pRightCamera);
@@ -33,13 +37,11 @@ int main(){
 	iSurround.InitK_G(1000, 1000, 0.1, 0.1);
 
 	cout << "Finish init K_G" << endl;
-	pLeftCamera->BlurPose();
-	pRightCamera->BlurPose();
-	cv::Mat mSurroundView = iSurround.GenerateSurroundView(0, 1000, 1000);
+	cv::Mat mSurroundView = iSurround.GenerateSurroundView(2, 1000, 1000);
 	cv::imshow("const cv::String &winname", mSurroundView);
 	cv::waitKey(0);
 
-	iSurround.OptimizePoseWithOneFrame(0);
+	iSurround.OptimizePoseWithOneFrame(2);
 
 	mSurroundView = iSurround.GenerateSurroundView(2, 1000, 1000);
 	cv::imshow("const cv::String &winname", mSurroundView);
