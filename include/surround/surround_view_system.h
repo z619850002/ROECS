@@ -57,7 +57,10 @@ public:
 							cv::Mat & mGrayROI_Left);
 
 
+	//Use one pair of frames to optimize the pose.
 	bool OptimizePoseWithOneFrame(int nIndex);
+	//Use multiple frames to optimize the pose.
+	bool OptimizeWithMultiFrame(vector<int> gIndices);
 
 
 	//Cameras in the surround-view system.

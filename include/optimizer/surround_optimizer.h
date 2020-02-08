@@ -112,7 +112,7 @@ public:
 	bool Optimize(){
 		cout << "Edge number" << endl << m_iOptimizer.edges().size() << endl;
 		m_iOptimizer.initializeOptimization();
-	    m_iOptimizer.optimize ( 100 );
+	    m_iOptimizer.optimize ( 30 );
 
 	    //Load poses.
 	    //Front.

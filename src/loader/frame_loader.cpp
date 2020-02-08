@@ -56,3 +56,19 @@ vector<SVPair> FrameLoader::LoadFramePairs(vector<int> gIndexes){
 	}
 	return gPairs;
 }
+
+
+vector<SVPair> FrameLoader::LoadAll(){
+	LoadFilenames(this->m_aDirectoryName);
+	vector<SVPair> gPairs;
+	for (int nIndex = 0; nIndex < this->m_gFrontFilenames.size(); nIndex++){
+		//Get the Frame.
+		Frame * pFrontFrame = new Frame(m_gFrontFilenames[nIndex] , m_pFrontCamera);
+		Frame * pLeftFrame = new Frame(m_gLeftFilenames[nIndex] , m_pLeftCamera);
+		Frame * pBackFrame = new Frame(m_gBackFilenames[nIndex] , m_pBackCamera);
+		Frame * pRightFrame = new Frame(m_gRightFilenames[nIndex] , m_pRightCamera);
+		//Construct the pair.
+		gPairs.push_back(SVPair(pFrontFrame, pLeftFrame, pBackFrame, pRightFrame));
+	}
+	return gPairs;
+}

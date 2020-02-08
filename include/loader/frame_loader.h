@@ -28,6 +28,8 @@ public:
 
 	vector<SVPair> LoadFramePairs(vector<int> gIndexes); 
 
+	vector<SVPair> LoadAll(); 
+
 	//The directory of all data.
 	string m_aDirectoryName;
 	//The filenames of frames captured by different cameras.

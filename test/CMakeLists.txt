@@ -12,3 +12,7 @@ TARGET_LINK_LIBRARIES( frame_loader_test dynamic_adjustment)
 
 ADD_EXECUTABLE(surround_view_test surround_view_test.cpp)
 TARGET_LINK_LIBRARIES( surround_view_test dynamic_adjustment)
+
+
+ADD_EXECUTABLE(surround_multi_test surround_multi_test.cpp)
+TARGET_LINK_LIBRARIES( surround_multi_test dynamic_adjustment)

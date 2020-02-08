@@ -1,1 +1,2 @@
-
+ADD_EXECUTABLE(online_correction online_correction.cpp)
+TARGET_LINK_LIBRARIES( online_correction dynamic_adjustment)
