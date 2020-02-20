@@ -1,5 +1,5 @@
-#ifndef DIRECT_UNARY_EDGE_H_
-#define DIRECT_UNARY_EDGE_H_
+#ifndef DIRECT_BINARY_EDGE_H_
+#define DIRECT_BINARY_EDGE_H_
 
 #include <iostream>
 #include <g2o/core/base_vertex.h>
@@ -19,7 +19,7 @@
 #include <chrono>
 using namespace std; 
 
-
+    
 
 
 //This is a binary edge. The depth of each pixel is considered in the optimization.
@@ -28,13 +28,27 @@ class DirectBinaryEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
         //Default Constructor.
-        DirectBinaryEdge() {}
+        DirectBinaryEdge(): g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3Expmap , g2o::VertexSBAPointXYZ>() {}
+        
         //Constructor.
-        DirectBinaryEdge(float nFx , float nFy , 
-                        float nCx , float nCy , cv::Mat * pImage):
-                        m_mPoint3d(mPoint3d), m_nFx(nFx), m_nFy(nFy),
-                        m_nCx(nCx), m_nCy(nCy), m_pImage(pImage){
-                        }
+        // DirectBinaryEdge(float nFx , float nFy , 
+        //                 float nCx , float nCy , cv::Mat * pImage):g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3Expmap , g2o::VertexSBAPointXYZ>()
+        //                 {
+        //                     this->m_pImage = pImage;
+        //                     this->m_nFx = nFx;
+        //                     this->m_nFy = nFy;
+        //                     this->m_nCx = nCx;
+        //                     this->m_nCy = nCy;
+        //                 }
+
+        void BindParameters(float nFx , float nFy , 
+                        float nCx , float nCy , cv::Mat * pImage){
+            this->m_pImage = pImage;
+            this->m_nFx = nFx;
+            this->m_nFy = nFy;
+            this->m_nCx = nCx;
+            this->m_nCy = nCy;
+        }
 
         virtual void computeError(){
             //Get the vertex.
@@ -58,16 +72,26 @@ class DirectBinaryEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
         }
 
         virtual void linearizeOplus(){
+
             if (level() == 1){
                 //Out of boundary.
                 _jacobianOplusXi = Eigen::Matrix<double, 1, 6>::Zero();
+                _jacobianOplusXj = Eigen::Matrix<double, 1, 3>::Zero();
+                return ;
             }
+            _jacobianOplusXi = Eigen::Matrix<double, 1, 6>::Zero();
+            _jacobianOplusXj = Eigen::Matrix<double, 1, 3>::Zero();
+
             //calculate basic attributes.
             const g2o::VertexSE3Expmap * pPoseVertex = static_cast<const g2o::VertexSE3Expmap *>(_vertices[0]);
+
             const g2o::VertexSBAPointXYZ * pPointVertex = static_cast<const g2o::VertexSBAPointXYZ *>(_vertices[1]);
+
             //The coordinate in camera coordinate system.
-            Eigen::Vector3d mPoint3d = mPointVertex->estimate();
+            Eigen::Vector3d mPoint3d = pPointVertex->estimate();
+
             Eigen::Vector3d mPoint_Camera = pPoseVertex->estimate().map(mPoint3d);
+
             //Map the point on the image.
             double nInverseDepth = 1.0 / mPoint_Camera[2];
             double x = mPoint_Camera[0];
@@ -96,20 +120,23 @@ class DirectBinaryEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
             jacobian_uv_ksai(1 , 5) = -y / (z*z) * m_nFy;
 
             Eigen::Matrix<double , 1 , 2> jacobian_pixel_uv;
+            
             jacobian_pixel_uv(0 , 0) = (getPixelValue(u+1, v) - getPixelValue(u-1, v))/2;
-
+            
             jacobian_pixel_uv(0 , 1) = (getPixelValue(u, v+1) - getPixelValue(u, v-1))/2;
 
-            _jacobianOplusXi = jacobian_pixel_uv * jacobian_uv_ksai;
 
-            //TODO: The jacobian on the point is not implemented yet.
-            _jacobianOplusYi = Eigen::Matrix<double ,1 , 6>();
-            _jacobianOplusYi(0 , 0) = 0.0;
-            _jacobianOplusYi(0 , 1) = 0.0;
-            _jacobianOplusYi(0 , 2) = 0.0;
-            _jacobianOplusYi(0 , 3) = 0.0;
-            _jacobianOplusYi(0 , 4) = 0.0;
-            _jacobianOplusYi(0 , 5) = 0.0;
+            Eigen::Matrix<double , 2 , 3> mJacibian_u_q;
+            mJacibian_u_q(0 , 0) = m_nFx/z;
+            mJacibian_u_q(0 , 1) = 0.0;
+            mJacibian_u_q(0 , 2) =  - m_nFx * x /(z*z);
+            mJacibian_u_q(1 , 0) = 0.0;
+            mJacibian_u_q(1 , 1) = m_nFy/z;
+            mJacibian_u_q(1 , 2) = - m_nFy * y /(z*z);
+
+
+            _jacobianOplusXi = jacobian_pixel_uv * jacobian_uv_ksai;
+            _jacobianOplusXj =  jacobian_pixel_uv * mJacibian_u_q * pPoseVertex->estimate().rotation().toRotationMatrix();
         }
 
         virtual bool read(std::istream& in) {}
@@ -129,15 +156,14 @@ class DirectBinaryEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
             return result;
         }
 
-
         //The intrinsic of the camera.
-        float m_nFx = 0, m_nFy = 0;
+        float m_nFx, m_nFy;
         //The center of the image.
         //nCx,nCy is the negative value of the left
         //top coordinate of the undistorted image.
-        float m_nCx = 0, m_nCy = 0;
+        float m_nCx, m_nCy;
         //Gray image.
-        cv::Mat * m_pImage = nullptr;
+        cv::Mat * m_pImage;
 };
 
 

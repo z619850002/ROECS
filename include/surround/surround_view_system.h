@@ -27,6 +27,7 @@
 #include "../frame/frame_pair.h"
 #include "../optimizer/direct_unary_edge.h"
 #include "../../include/optimizer/surround_optimizer.h"
+#include "../../include/selection/pixel_selection.h"
 using namespace std;
 
 class SurroundView
@@ -49,6 +50,8 @@ public:
 
 	bool GetUndistortedROI(int nIndex, int nCameraIndex, cv::Mat & mROI_Left, cv::Mat & mROI_Right,
 							vector<int> & gROI_Left , vector<int> & gROI_Right);
+
+	bool GetBirdseyeROI(int nIndex, int nCameraIndex, cv::Mat & mROI_Left, cv::Mat & mROI_Right);
 
 
 	bool AddEdge(int nIndex, int nCameraIndex,

@@ -2,8 +2,12 @@
 #define SURROUND_OPTIMIZER_H_
 
 #include "direct_unary_edge.h"
+#include "direct_binary_edge.h"
 #include "../camera/camera.h"
 
+//Robust kernel
+#include "g2o/core/robust_kernel_impl.h"
+#include "g2o/core/batch_stats.h"
 using namespace std;
 
 class SurroundOptimizer
@@ -17,7 +21,8 @@ public:
 	{
 		//Construct the optimizer.
 	    //Now we use Levenberg solver. GN,LM,Dogleg is also avaliable.
-	    typedef g2o::BlockSolver<g2o::BlockSolverTraits<6,1>> DirectBlock;  // 求解的向量是6＊1的
+	    // typedef g2o::BlockSolver<g2o::BlockSolverTraits<6,3>> DirectBlock;  // 求解的向量是6＊1的
+	    typedef g2o::BlockSolverX DirectBlock;
 	    std::unique_ptr<DirectBlock::LinearSolverType> pLinearSolver (new g2o::LinearSolverDense< DirectBlock::PoseMatrixType > ());
 	    std::unique_ptr<DirectBlock> pSolverPtr (new DirectBlock ( std::move(pLinearSolver) ));
 	    // g2o::OptimizationAlgorithmGaussNewton* solver = new g2o::OptimizationAlgorithmGaussNewton( solver_ptr ); // G-N
@@ -68,6 +73,61 @@ public:
 	    m_nEdgeIndex = 4;
 	}
 
+	bool AddBinaryEdge(	Eigen::Vector3d mPoint3d, int nCameraIndex,
+				 		vector<int> gROI, double nMeasurement,
+				 		cv::Mat * pGrayImage){
+
+			//Firstly create the point vertex. It's the 3d position of the point.
+			g2o::VertexSBAPointXYZ * pPointVertex = new g2o::VertexSBAPointXYZ();
+			this->m_gPointVertices.push_back(pPointVertex);
+        	pPointVertex->setId(m_nEdgeIndex++);
+        	pPointVertex->setEstimate(Eigen::Vector3d(mPoint3d(0 , 0),
+                                             		  mPoint3d(1 , 0),
+                                              		  mPoint3d(2 , 0)));
+        	pPointVertex->setMarginalized(true);
+        	// pPointVertex->setFixed(true);
+        	this->m_iOptimizer.addVertex(pPointVertex);
+
+            double nFx, nFy, nCx, nCy;
+            vector<Camera *> gpCameras = {
+            	m_pFrontCamera,
+            	m_pLeftCamera,
+            	m_pBackCamera,
+            	m_pRightCamera
+            };
+            Camera * pCamera = gpCameras[nCameraIndex];
+
+            //Get the intrinsics.
+            nFx = pCamera->m_mK(0 , 0);
+            nFy = pCamera->m_mK(1 , 1);
+            nCx = pCamera->m_mK(0 , 2) - gROI[0];
+            nCy = pCamera->m_mK(1 , 2) - gROI[1];
+
+			DirectBinaryEdge* pEdge = new DirectBinaryEdge ();
+			pEdge->BindParameters(nFx,
+	            nFy,
+	            nCx,
+	            nCy,
+	            pGrayImage);
+
+			vector<g2o::VertexSE3Expmap*> gpPoseVertices = {
+				m_pPoseFront,
+				m_pPoseLeft,
+				m_pPoseBack,
+				m_pPoseRight
+			};
+			pEdge->setVertex ( 0, gpPoseVertices[nCameraIndex] );
+			pEdge->setVertex ( 1, pPointVertex);
+	        pEdge->setMeasurement (nMeasurement);
+	        pEdge->setInformation ( Eigen::Matrix<double,1,1>::Identity() );
+	        pEdge->setId ( m_nEdgeIndex++ );
+	        g2o::RobustKernel * kernel = new g2o::RobustKernelCauchy;
+            kernel->setDelta(23.3);
+            pEdge->setRobustKernel(kernel);
+	        m_iOptimizer.addEdge ( pEdge );	
+	}
+
+
 	bool AddEdge(	Eigen::Vector3d mPoint3d, int nCameraIndex,
 				 	vector<int> gROI, double nMeasurement,
 				 	cv::Mat * pGrayImage){
@@ -112,7 +172,7 @@ public:
 	bool Optimize(){
 		cout << "Edge number" << endl << m_iOptimizer.edges().size() << endl;
 		m_iOptimizer.initializeOptimization();
-	    m_iOptimizer.optimize ( 30 );
+	    m_iOptimizer.optimize ( 100 );
 
 	    //Load poses.
 	    //Front.
@@ -141,6 +201,8 @@ public:
 	g2o::VertexSE3Expmap* m_pPoseBack;
 	g2o::VertexSE3Expmap* m_pPoseRight;
 
+
+	vector<g2o::VertexSBAPointXYZ *> m_gPointVertices;
 
 	//Cameras.
 	Camera * m_pFrontCamera;

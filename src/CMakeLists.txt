@@ -1,4 +1,5 @@
 ADD_LIBRARY( dynamic_adjustment SHARED
+	./selection/pixel_selection.cpp
 	./initializer/initializer.cpp
 	./camera/camera.cpp
 	./frame/frame.cpp

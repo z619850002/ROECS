@@ -26,7 +26,7 @@ int main(){
 						pRightCamera);
 
 	cout << "Load pairs" << endl;
-	vector<SVPair> gPairs = iLoader.LoadFramePairs(vector<int>{0 , 1 , 2 , 3});
+	vector<SVPair> gPairs = iLoader.LoadFramePairs(vector<int>{0 , 1, 2  , 3});
 
 	SurroundView iSurround(pFrontCamera, pLeftCamera, pBackCamera, pRightCamera);
 
@@ -37,15 +37,46 @@ int main(){
 	iSurround.InitK_G(1000, 1000, 0.1, 0.1);
 
 	cout << "Finish init K_G" << endl;
+
 	cv::Mat mSurroundView = iSurround.GenerateSurroundView(0, 1000, 1000);
 	cv::imshow("const cv::String &winname", mSurroundView);
 	cv::waitKey(0);
 
+
+	mSurroundView = iSurround.GenerateSurroundView(1, 1000, 1000);
+	cv::imshow("const cv::String &winname", mSurroundView);
+	cv::waitKey(0);
+
+
+	mSurroundView = iSurround.GenerateSurroundView(2, 1000, 1000);
+	cv::imshow("const cv::String &winname", mSurroundView);
+	cv::waitKey(0);
+
+
+	mSurroundView = iSurround.GenerateSurroundView(3, 1000, 1000);
+	cv::imshow("const cv::String &winname", mSurroundView);
+	cv::waitKey(0);
+
 	// iSurround.OptimizePoseWithOneFrame(2);
-	vector<int> gIndices = {0,1,2,3};
+	vector<int> gIndices = { 1 , 2  , 3};
 	iSurround.OptimizeWithMultiFrame(gIndices);
 
 	mSurroundView = iSurround.GenerateSurroundView(0, 1000, 1000);
+	cv::imshow("const cv::String &winname", mSurroundView);
+	cv::waitKey(0);
+
+
+	mSurroundView = iSurround.GenerateSurroundView(1, 1000, 1000);
+	cv::imshow("const cv::String &winname", mSurroundView);
+	cv::waitKey(0);
+
+
+	mSurroundView = iSurround.GenerateSurroundView(2, 1000, 1000);
+	cv::imshow("const cv::String &winname", mSurroundView);
+	cv::waitKey(0);
+
+
+	mSurroundView = iSurround.GenerateSurroundView(3, 1000, 1000);
 	cv::imshow("const cv::String &winname", mSurroundView);
 	cv::waitKey(0);
 

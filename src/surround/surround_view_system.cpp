@@ -2,6 +2,7 @@
 #include "utils.h"
 #include "../../include/optimizer/direct_unary_edge.h"
 #include "../../include/optimizer/surround_optimizer.h"
+
 using namespace std;
 
 
@@ -87,6 +88,31 @@ SurroundView::SurroundView(	Camera * pFrontCamera, Camera * pLeftCamera,
 		this->m_pRightCamera);
 	
 }
+
+bool SurroundView::GetBirdseyeROI(	int nIndex, int nPosIndex,
+							 		cv::Mat & mROI_Left, cv::Mat & mROI_Right){
+	//Pos index = 0, FL,
+	//Pos index = 1, LB,
+	//Pos index = 2, BR,
+	//Pos index = 3, RF.
+
+	vector<int> gLeftIndex = {1 , 2 , 3 , 0};
+	vector<int> gRightIndex = {0 , 1 , 2 , 3};
+
+	cv::Mat mLeftBirdsEye = this->GenerateBirdsView(nIndex, gLeftIndex[nPosIndex], 1000, 1000);
+	cv::Mat mRightBirdsEye = this->GenerateBirdsView(nIndex, gLeftIndex[nPosIndex], 1000, 1000);
+
+	// mROI_Left = mLeftBirdsEye
+	vector<cv::Rect> gRect = {	
+		m_iROI_FL, m_iROI_LB, m_iROI_BR, m_iROI_RF
+	};
+
+	mROI_Left = mLeftBirdsEye(gRect[nPosIndex]);
+	mROI_Right = mRightBirdsEye(gRect[nPosIndex]);
+
+	return true;
+}
+
 
 bool SurroundView::GetUndistortedROI(int nIndex, int nCameraIndex, cv::Mat & mROI_Left, cv::Mat & mROI_Right,
 										vector<int> & gROI_Left , vector<int> & gROI_Right){
@@ -327,9 +353,14 @@ bool SurroundView::AddEdge(int nIndex, int nCameraIndex,
 	double nCoef_Right = cv::mean(mBirdseyeGray_Right).val[0]/cv::mean(mMeasurementGray_Right).val[0];
 	double nCoef_Left = cv::mean(mBirdseyeGray_Left).val[0]/cv::mean(mMeasurementGray_Left).val[0];
 
+	PixelSelection iSelection;
+	vector<cv::Point2d> gPointsRight = iSelection.GetPixels(mMeasurementGray_Right);
+	vector<cv::Point2d> gPointsLeft = iSelection.GetPixels(mMeasurementGray_Left);
+	
+
 	//Add edges in the right region.
-	for (int u=0;u<iRightROI.width;u++){
-		for (int v=0;v<iRightROI.height;v++){
+	for (cv::Point2d iPoint2d : gPointsRight){
+		int u = iPoint2d.x , v = iPoint2d.y;
 			//Get the surround-view coordinate of the point.
 			int nU = u + iRightROI.x;
 			int nV = v + iRightROI.y;
@@ -362,12 +393,18 @@ bool SurroundView::AddEdge(int nIndex, int nCameraIndex,
             	gOriginROI_Right,
             	nMeasurement,
             	&mGrayROI_Right);
-		}		
+
+            // this->m_pOptimizer->AddBinaryEdge(
+            // 	mPoint3d,
+            // 	nCameraIndex,
+            // 	gOriginROI_Right,
+            // 	nMeasurement,
+            // 	&mGrayROI_Right);	
 	}
 
 	//Add edges in the left region.
-	for (int u=0;u<iLeftROI.width;u++){
-		for (int v=0;v<iLeftROI.height;v++){
+	for (cv::Point2d iPoint2d : gPointsLeft){
+			int u = iPoint2d.x , v = iPoint2d.y;
 			//Get the surround-view coordinate of the point.
 			int nU = u + iLeftROI.x;
 			int nV = v + iLeftROI.y;
@@ -387,7 +424,13 @@ bool SurroundView::AddEdge(int nIndex, int nCameraIndex,
             	gOriginROI_Left,
             	nMeasurement,
             	&mGrayROI_Left);
-		}		
+            
+            // this->m_pOptimizer->AddBinaryEdge(
+            // 	mPoint3d,
+            // 	nCameraIndex,
+            // 	gOriginROI_Left,
+            // 	nMeasurement,
+            // 	&mGrayROI_Left);		
 	}	
 }
 
