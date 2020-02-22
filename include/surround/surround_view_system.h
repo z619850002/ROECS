@@ -48,16 +48,33 @@ public:
 	//Bind the image pairs, equal to a setter.
 	bool BindImagePairs(vector<SVPair> gDistortedPairs);
 
+
+
+	//Get the undistort ROI of all projection to one camera, totally 2 couples.
 	bool GetUndistortedROI(int nIndex, int nCameraIndex, cv::Mat & mROI_Left, cv::Mat & mROI_Right,
 							vector<int> & gROI_Left , vector<int> & gROI_Right);
+	//Get the undistort ROI of one couple. Like FL, BR.
+	bool GetCoupleROI(int nIndex, int nCameraIndex_Left, int nCameraIndex_Right,
+					  cv::Mat & mROI_Left, cv::Mat & mROI_Right,
+					  vector<int> & gROI_Left, vector<int> & gROI_Right);
+
+
 
 	bool GetBirdseyeROI(int nIndex, int nCameraIndex, cv::Mat & mROI_Left, cv::Mat & mROI_Right);
 
 
+	//Add all edges projecting on one camera.
 	bool AddEdge(int nIndex, int nCameraIndex,
 							vector<cv::Mat> & gSurroundViews,
 							cv::Mat & mGrayROI_Right,
 							cv::Mat & mGrayROI_Left);
+
+	//Add a couple of edges.
+	bool AddCoupleEdges(int nIndex, 
+					int nCameraIndex_1, int nCameraIndex_2,
+					vector<cv::Mat> & gSurroundViews,
+					cv::Mat & mGrayROI_1,
+					cv::Mat & mGrayROI_2);
 
 
 	//Use one pair of frames to optimize the pose.

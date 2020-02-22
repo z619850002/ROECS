@@ -36,6 +36,9 @@ public:
 	    m_pPoseFront = new g2o::VertexSE3Expmap();
 	    m_pPoseFront->setEstimate ( g2o::SE3Quat ( 	m_pFrontCamera->m_mT.rotation_matrix() ,
 	    								   			m_pFrontCamera->m_mT.translation() ));
+	    //Front and Back are fixed.
+	    m_pPoseFront->setFixed(true);
+
 	    //Front ID is 0.
 	    m_pPoseFront->setId ( 0 );
 	    m_iOptimizer.addVertex ( m_pPoseFront );
@@ -55,6 +58,9 @@ public:
 	    m_pPoseBack = new g2o::VertexSE3Expmap();
 	    m_pPoseBack->setEstimate ( g2o::SE3Quat ( 	m_pBackCamera->m_mT.rotation_matrix() ,
 	    								   			m_pBackCamera->m_mT.translation() ));
+
+	    //Front and Back are fixed.
+	    m_pPoseBack->setFixed(true);
 
 	    //Back ID is 2.
 	    m_pPoseBack->setId ( 2 );
@@ -85,7 +91,7 @@ public:
                                              		  mPoint3d(1 , 0),
                                               		  mPoint3d(2 , 0)));
         	pPointVertex->setMarginalized(true);
-        	// pPointVertex->setFixed(true);
+        	pPointVertex->setFixed(true);
         	this->m_iOptimizer.addVertex(pPointVertex);
 
             double nFx, nFy, nCx, nCy;
@@ -125,6 +131,100 @@ public:
             kernel->setDelta(23.3);
             pEdge->setRobustKernel(kernel);
 	        m_iOptimizer.addEdge ( pEdge );	
+	}
+
+
+
+	bool AddFixedBinaryEdge(	Eigen::Vector3d mPoint3d, 
+								int nCameraIndex1, vector<int> gROI1, double nMeasurement1, cv::Mat * pGrayImage1,
+								int nCameraIndex2, vector<int> gROI2, double nMeasurement2, cv::Mat * pGrayImage2){
+
+			//Firstly create the point vertex. It's the 3d position of the point.
+			g2o::VertexSBAPointXYZ * pPointVertex = new g2o::VertexSBAPointXYZ();
+			this->m_gPointVertices.push_back(pPointVertex);
+        	pPointVertex->setId(m_nEdgeIndex++);
+        	pPointVertex->setEstimate(Eigen::Vector3d(mPoint3d(0 , 0),
+                                             		  mPoint3d(1 , 0),
+                                              		  mPoint3d(2 , 0)));
+        	pPointVertex->setMarginalized(true);
+        	// pPointVertex->setFixed(true);
+        	this->m_iOptimizer.addVertex(pPointVertex);
+
+        	//Then create edges.
+            vector<Camera *> gpCameras = {
+            	m_pFrontCamera,
+            	m_pLeftCamera,
+            	m_pBackCamera,
+            	m_pRightCamera
+            };
+            //2 cameras.
+            Camera * pCamera1 = gpCameras[nCameraIndex1];
+            Camera * pCamera2 = gpCameras[nCameraIndex2];
+
+            //Construct the first edge.
+            double nFx1, nFy1, nCx1, nCy1;
+            //Get the intrinsics.
+            nFx1 = pCamera1->m_mK(0 , 0);
+            nFy1 = pCamera1->m_mK(1 , 1);
+            nCx1 = pCamera1->m_mK(0 , 2) - gROI1[0];
+            nCy1 = pCamera1->m_mK(1 , 2) - gROI1[1];
+
+			DirectBinaryEdge* pEdge1 = new DirectBinaryEdge ();
+			pEdge1->BindParameters(nFx1,
+	            nFy1,
+	            nCx1,
+	            nCy1,
+	            pGrayImage1);
+
+            //Construct the second edge.
+            double nFx2, nFy2, nCx2, nCy2;
+            //Get the intrinsics.
+            nFx2 = pCamera2->m_mK(0 , 0);
+            nFy2 = pCamera2->m_mK(1 , 1);
+            nCx2 = pCamera2->m_mK(0 , 2) - gROI2[0];
+            nCy2 = pCamera2->m_mK(1 , 2) - gROI2[1];
+
+			DirectBinaryEdge* pEdge2 = new DirectBinaryEdge ();
+			pEdge2->BindParameters(nFx2,
+	            nFy2,
+	            nCx2,
+	            nCy2,
+	            pGrayImage2);
+
+
+
+
+			//Vertices of camera poses.
+			vector<g2o::VertexSE3Expmap*> gpPoseVertices = {
+				m_pPoseFront,
+				m_pPoseLeft,
+				m_pPoseBack,
+				m_pPoseRight
+			};
+
+			//Robust kernel.
+			g2o::RobustKernel * kernel = new g2o::RobustKernelCauchy;
+            kernel->setDelta(23.3);
+
+			//Add the first edge.
+			pEdge1->setVertex ( 0, gpPoseVertices[nCameraIndex1] );
+			pEdge1->setVertex ( 1, pPointVertex);
+	        pEdge1->setMeasurement (nMeasurement1);
+	        pEdge1->setInformation ( Eigen::Matrix<double,1,1>::Identity() );
+	        pEdge1->setId ( m_nEdgeIndex++ );
+            pEdge1->setRobustKernel(kernel);
+
+
+            //Add the second edge.
+			pEdge2->setVertex ( 0, gpPoseVertices[nCameraIndex2] );
+			pEdge2->setVertex ( 1, pPointVertex);
+	        pEdge2->setMeasurement (nMeasurement2);
+	        pEdge2->setInformation ( Eigen::Matrix<double,1,1>::Identity() );
+	        pEdge2->setId ( m_nEdgeIndex++ );
+            pEdge2->setRobustKernel(kernel);
+
+	        m_iOptimizer.addEdge ( pEdge1 );	
+	        m_iOptimizer.addEdge ( pEdge2 );	
 	}
 
 
