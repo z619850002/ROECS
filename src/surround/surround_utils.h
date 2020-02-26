@@ -1,3 +1,6 @@
+#ifndef SURROUND_UTILS_H_
+#define SURROUND_UTILS_H_
+
 #include "../../include/surround/surround_view_system.h"
 
 using namespace std;
@@ -284,3 +287,6 @@ void CalculateROI(	cv::Mat & mImage , cv::Mat & mROI ,
 
 
 }
+
+
+#endif

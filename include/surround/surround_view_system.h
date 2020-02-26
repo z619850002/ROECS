@@ -25,9 +25,8 @@
 
 #include "../camera/camera.h"
 #include "../frame/frame_pair.h"
-#include "../optimizer/direct_unary_edge.h"
-#include "../../include/optimizer/surround_optimizer.h"
-#include "../../include/selection/pixel_selection.h"
+#include "../optimizer/surround_optimizer.h"
+#include "../selection/pixel_selection.h"
 using namespace std;
 
 class SurroundView

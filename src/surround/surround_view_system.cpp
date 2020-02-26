@@ -1,7 +1,5 @@
 #include "../../include/surround/surround_view_system.h"
-#include "utils.h"
-#include "../../include/optimizer/direct_unary_edge.h"
-#include "../../include/optimizer/surround_optimizer.h"
+#include "surround_utils.h"
 
 using namespace std;
 
@@ -463,6 +461,7 @@ bool SurroundView::AddEdge(int nIndex, int nCameraIndex,
             	gOriginROI_Right,
             	nMeasurement,
             	&mGrayROI_Right);	
+
 	}
 
 	//Add edges in the left region.
@@ -605,19 +604,38 @@ bool SurroundView::AddCoupleEdges(int nIndex,
 
         double nMeasurement = mBirdseyeGray_1.at<double>(v , u) * nCoef;
         //From 1 to 2
-        this->m_pOptimizer->AddEdge(
-        	mPoint3d,
-        	nCameraIndex_2,
-        	gOriginROI_2,
-        	nMeasurement,
-        	&mGrayROI_2);
+        // this->m_pOptimizer->AddEdge(
+        // 	mPoint3d,
+        // 	nCameraIndex_2,
+        // 	gOriginROI_2,
+        // 	nMeasurement,
+        // 	&mGrayROI_2);
 
         // this->m_pOptimizer->AddBinaryEdge(
         // 	mPoint3d,
-        // 	nCameraIndex,
-        // 	gOriginROI_Right,
+        // 	nCameraIndex_2,
+        // 	gOriginROI_2,
         // 	nMeasurement,
-        // 	&mGrayROI_Right);	
+        // 	&mGrayROI_2);
+
+        // this->m_pOptimizer->AddFixedBinaryEdge(
+        // 	mPoint3d, 
+        // 	nCameraIndex_1, 
+        // 	gOriginROI_1, 
+        // 	nMeasurement/nCoef, 
+        // 	&mGrayROI_1, 
+        // 	nCameraIndex_2, 
+        // 	gOriginROI_2, 
+        // 	nMeasurement, 
+        // 	&mGrayROI_2);
+
+        this->m_pOptimizer->AddInverseDepthEdge(
+        	mPoint3d,
+        	nCameraIndex_1,
+        	nCameraIndex_2,
+        	gOriginROI_2, 
+        	nMeasurement, 
+        	&mGrayROI_2);
 	}
 }
 

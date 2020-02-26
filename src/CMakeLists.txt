@@ -5,7 +5,9 @@ ADD_LIBRARY( dynamic_adjustment SHARED
 	./frame/frame.cpp
 	./frame/frame_pair.cpp
 	./loader/frame_loader.cpp
+	./optimizer/surround_optimizer.cpp
 	./surround/surround_view_system.cpp
+	./utils/utils.cpp
 )
 
 

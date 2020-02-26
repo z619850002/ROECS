@@ -39,12 +39,14 @@ int main(){
 	cout << "Finish init K_G" << endl;
 	cv::Mat mSurroundView = iSurround.GenerateSurroundView(0, 1000, 1000);
 	cv::imshow("const cv::String &winname", mSurroundView);
+	cv::imwrite("before.jpg" , mSurroundView);
 	cv::waitKey(0);
 
 	iSurround.OptimizePoseWithOneFrame(0);
 
 	mSurroundView = iSurround.GenerateSurroundView(0, 1000, 1000);
 	cv::imshow("const cv::String &winname", mSurroundView);
+	cv::imwrite("after.jpg" , mSurroundView);
 	cv::waitKey(0);
 
 

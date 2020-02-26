@@ -1,5 +1,15 @@
-#ifndef DIRECT_BINARY_EDGE_H_
-#define DIRECT_BINARY_EDGE_H_
+#ifndef INVERSE_DEPTH_EDGE_H_
+#define INVERSE_DEPTH_EDGE_H_
+
+#include <g2o/core/base_vertex.h>
+#include <g2o/core/base_unary_edge.h>
+#include <g2o/core/block_solver.h>
+#include <g2o/core/optimization_algorithm_levenberg.h>
+#include <g2o/core/optimization_algorithm_gauss_newton.h>
+#include <g2o/core/optimization_algorithm_dogleg.h>
+#include <g2o/solvers/dense/linear_solver_dense.h>
+
+
 
 #include <iostream>
 #include <g2o/core/base_vertex.h>
@@ -18,46 +28,128 @@
 #include <opencv2/core/core.hpp>
 #include <cmath>
 #include <chrono>
+
+
+#include "../camera/camera.h"
+
 using namespace std; 
 
-    
+
+
+
+
+
+
+
+// 曲线模型的顶点，模板参数：优化变量维度和数据类型
+class InverseDepthVertex: public g2o::BaseVertex<1, double>
+{
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+ 	void BindParameters(double nNormalized_U, double nNormalized_V, 
+                        Sophus::SE3 mProjectingPose){
+ 		this->m_nNormalized_U = nNormalized_U;
+ 		this->m_nNormalized_V = nNormalized_V;
+        this->m_mProjectingPose = mProjectingPose;
+ 	}
+
+
+
+ 	
+
+    virtual void setToOriginImpl() // 重置
+    {
+        _estimate = 0;
+    }
+
+    virtual void oplusImpl( const double* update ) // 更新
+    {
+        _estimate += update[0];
+    }
+
+    virtual bool read( istream& in ) {}
+    virtual bool write( ostream& out ) const {}
+
+    //Personal
+    //Use the normalized coordinate,
+ 	//the inverse depth and the projecting pose
+ 	//to get the 3D point in
+ 	//the ground coordinate system.
+ 	Eigen::Vector3d Get3DPoint() const {
+ 		//Point in the camera coordinate.
+ 		//Use the inverse depth.
+ 		//This is in the homogeneous coordinate.
+ 		Eigen::Vector4d mPoint_Camera = (1/_estimate) * Eigen::Vector4d(
+ 				this->m_nNormalized_U,
+ 				this->m_nNormalized_V,
+ 				1,
+ 				_estimate
+ 			);
+ 		Eigen::Vector4d mHomogeneous = (m_mProjectingPose.inverse()).matrix() * mPoint_Camera;
+ 		return Eigen::Vector3d(
+ 				mHomogeneous[0]/mHomogeneous[3],
+ 				mHomogeneous[1]/mHomogeneous[3],
+ 				mHomogeneous[2]/mHomogeneous[3]
+ 			);
+ 	}
+
+ 	//From camera to ground.
+ 	Eigen::Matrix3d GetRotationToGround() const {
+ 		return (m_mProjectingPose.inverse()).rotation_matrix();
+ 	}
+
+ 	//Derivatives from the P_i to the inverse depth.
+ 	Eigen::Vector3d GetDerivatives() const {
+ 		double nLamda = this->_estimate;
+ 		return -(1/(nLamda * nLamda)) * Eigen::Vector3d(
+ 				this->m_nNormalized_U,
+ 				this->m_nNormalized_V,
+ 				1
+ 			);
+ 	}
+
+
+
+
+    //Normalized coordinate.
+    double m_nNormalized_U;
+    double m_nNormalized_V;
+
+    //From ground to camera.
+    Sophus::SE3 m_mProjectingPose;
+};
+
+
 
 
 //This is a binary edge. The depth of each pixel is considered in the optimization.
-class DirectBinaryEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3Expmap , g2o::VertexSBAPointXYZ>{
+class InverseDepthEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3Expmap , InverseDepthVertex>{
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
         //Default Constructor.
-        DirectBinaryEdge(): g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3Expmap , g2o::VertexSBAPointXYZ>() {}
+        InverseDepthEdge(): g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3Expmap , InverseDepthVertex>() {}
         
-        //Constructor.
-        // DirectBinaryEdge(float nFx , float nFy , 
-        //                 float nCx , float nCy , cv::Mat * pImage):g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3Expmap , g2o::VertexSBAPointXYZ>()
-        //                 {
-        //                     this->m_pImage = pImage;
-        //                     this->m_nFx = nFx;
-        //                     this->m_nFy = nFy;
-        //                     this->m_nCx = nCx;
-        //                     this->m_nCy = nCy;
-        //                 }
 
         void BindParameters(float nFx , float nFy , 
-                        float nCx , float nCy , cv::Mat * pImage){
+                        	float nCx , float nCy , cv::Mat * pImage){
             this->m_pImage = pImage;
             this->m_nFx = nFx;
             this->m_nFy = nFy;
             this->m_nCx = nCx;
             this->m_nCy = nCy;
+
         }
 
         virtual void computeError(){
             //Get the vertex.
             const g2o::VertexSE3Expmap * pPoseVertex = static_cast<const g2o::VertexSE3Expmap *>(_vertices[0]);
-            //The 3d point vertex.
-            const g2o::VertexSBAPointXYZ * pPointVertex = static_cast<const g2o::VertexSBAPointXYZ *>(_vertices[1]);
+            //The inverse depth vertex. It can generate the 3d point.
+            const InverseDepthVertex * pPointInverseDepth = static_cast<const InverseDepthVertex *>(_vertices[1]);
+
             //The coordinate in camera coordinate system.
-            Eigen::Vector3d mPoint3d = pPointVertex->estimate();
+            Eigen::Vector3d mPoint3d = pPointInverseDepth->Get3DPoint();
             Eigen::Vector3d mPoint_Camera = pPoseVertex->estimate().map(mPoint3d);
             //Map the point on the image.
             float nU = mPoint_Camera[0] * m_nFx / mPoint_Camera[2] + m_nCx;
@@ -77,22 +169,21 @@ class DirectBinaryEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
             if (level() == 1){
                 //Out of boundary.
                 _jacobianOplusXi = Eigen::Matrix<double, 1, 6>::Zero();
-                _jacobianOplusXj = Eigen::Matrix<double, 1, 3>::Zero();
+                _jacobianOplusXj = Eigen::Matrix<double, 1, 1>::Zero();
                 return ;
             }
             _jacobianOplusXi = Eigen::Matrix<double, 1, 6>::Zero();
-            _jacobianOplusXj = Eigen::Matrix<double, 1, 3>::Zero();
+            _jacobianOplusXj = Eigen::Matrix<double, 1, 1>::Zero();
 
             //calculate basic attributes.
+			//Get the vertex.
             const g2o::VertexSE3Expmap * pPoseVertex = static_cast<const g2o::VertexSE3Expmap *>(_vertices[0]);
-
-            const g2o::VertexSBAPointXYZ * pPointVertex = static_cast<const g2o::VertexSBAPointXYZ *>(_vertices[1]);
+            //The inverse depth vertex. It can generate the 3d point.
+            const InverseDepthVertex * pInverseDepth = static_cast<const InverseDepthVertex *>(_vertices[1]);
 
             //The coordinate in camera coordinate system.
-            Eigen::Vector3d mPoint3d = pPointVertex->estimate();
-            if (mPoint3d[2] * mPoint3d[2] > 0.01){
-                cout << "point 3d " << endl << mPoint3d << endl;
-            }
+            Eigen::Vector3d mPoint3d = pInverseDepth->Get3DPoint();
+            
 
             Eigen::Vector3d mPoint_Camera = pPoseVertex->estimate().map(mPoint3d);
 
@@ -123,6 +214,13 @@ class DirectBinaryEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
             jacobian_uv_ksai(1 , 4) = m_nFy / z;
             jacobian_uv_ksai(1 , 5) = -y / (z*z) * m_nFy;
 
+            //1. dI_j/dp_j   2. dp_j/dP_j   3. dP_j/dP_i   4. dP_i/dlamda
+            //1. Gradient of I_j at p_j
+            //2. About the intrinsic of camera_j
+            //3. About the relative pose from camera_i to camera_j
+            //4. About the normalized coordinate
+
+
             Eigen::Matrix<double , 1 , 2> jacobian_pixel_uv;
             
             jacobian_pixel_uv(0 , 0) = (getPixelValue(u+1, v) - getPixelValue(u-1, v))/2;
@@ -138,16 +236,15 @@ class DirectBinaryEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
             mJacibian_u_q(1 , 1) = m_nFy/z;
             mJacibian_u_q(1 , 2) = - m_nFy * y /(z*z);
 
-            // mJacibian_u_q(0 , 0) = 10;
-            // mJacibian_u_q(0 , 1) = 0.0;
-            // mJacibian_u_q(0 , 2) =  - 10;
-            // mJacibian_u_q(1 , 0) = 0.0;
-            // mJacibian_u_q(1 , 1) = 10;
-            // mJacibian_u_q(1 , 2) = - 10;
+            Eigen::Matrix3d mRotation = pPoseVertex->estimate().rotation().toRotationMatrix();
+            mRotation = mRotation * pInverseDepth->GetRotationToGround();
+
 
 
             _jacobianOplusXi = jacobian_pixel_uv * jacobian_uv_ksai;
-            _jacobianOplusXj =  jacobian_pixel_uv * mJacibian_u_q * pPoseVertex->estimate().rotation().toRotationMatrix();
+
+
+            _jacobianOplusXj =  jacobian_pixel_uv * mJacibian_u_q * mRotation * pInverseDepth->GetDerivatives();
         }
 
         virtual bool read(std::istream& in) {}
@@ -176,6 +273,8 @@ class DirectBinaryEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
         //Gray image.
         cv::Mat * m_pImage;
 };
+
+
 
 
 
