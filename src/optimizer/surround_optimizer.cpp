@@ -1,5 +1,5 @@
 #include "../../include/optimizer/surround_optimizer.h"
-
+#include <cstdlib>
 using namespace std;
 
 SurroundOptimizer::SurroundOptimizer(	Camera * pFrontCamera, Camera * pLeftCamera,
@@ -12,6 +12,7 @@ SurroundOptimizer::SurroundOptimizer(	Camera * pFrontCamera, Camera * pLeftCamer
     // typedef g2o::BlockSolver<g2o::BlockSolverTraits<6,3>> DirectBlock;  // 求解的向量是6＊1的
     typedef g2o::BlockSolverX DirectBlock;
     std::unique_ptr<DirectBlock::LinearSolverType> pLinearSolver (new g2o::LinearSolverEigen< DirectBlock::PoseMatrixType > ());
+    // std::unique_ptr<DirectBlock::LinearSolverType> pLinearSolver (new g2o::LinearSolverDense< DirectBlock::PoseMatrixType > ());
     std::unique_ptr<DirectBlock> pSolverPtr (new DirectBlock ( std::move(pLinearSolver) ));
     // g2o::OptimizationAlgorithmGaussNewton* solver = new g2o::OptimizationAlgorithmGaussNewton( solver_ptr ); // G-N
     g2o::OptimizationAlgorithmLevenberg* pSolver = new g2o::OptimizationAlgorithmLevenberg ( std::move(pSolverPtr) ); // L-M
@@ -79,7 +80,7 @@ bool SurroundOptimizer::AddBinaryEdge(	Eigen::Vector3d mPoint3d, int nCameraInde
                                          		  mPoint3d(1 , 0),
                                           		  mPoint3d(2 , 0)));
     	pPointVertex->setMarginalized(true);
-    	pPointVertex->setFixed(true);
+    	// pPointVertex->setFixed(true);
     	this->m_iOptimizer.addVertex(pPointVertex);
 
         double nFx, nFy, nCx, nCy;
@@ -135,7 +136,7 @@ bool SurroundOptimizer::AddFixedBinaryEdge(	Eigen::Vector3d mPoint3d,
                                          		  mPoint3d(1 , 0),
                                           		  mPoint3d(2 , 0)));
     	pPointVertex->setMarginalized(true);
-    	// pPointVertex->setFixed(true);
+    	pPointVertex->setFixed(true);
     	this->m_iOptimizer.addVertex(pPointVertex);
 
     	//Then create edges.
@@ -249,11 +250,12 @@ bool SurroundOptimizer::AddInverseDepthEdge( 	Eigen::Vector3d mPoint3d,
 	pInverseDepth->BindParameters(nNormalized_U,
 								  nNormalized_V,
 								  pCamera1->m_mT);
-	pInverseDepth->setEstimate(nInverseDepth);
-	// pInverseDepth->setFixed(true);
 
-	// cout << "Original 3d is " << endl << mPoint3d << endl;
-	// cout << "3D point is " << endl << pInverseDepth->Get3DPoint() << endl;
+    pInverseDepth->setEstimate(nInverseDepth + ((m_nEdgeIndex%2)-1));
+
+	// pInverseDepth->setFixed(true);
+    this->m_gInverseDepthVertices.push_back(pInverseDepth);
+
 
     this->m_iOptimizer.addVertex(pInverseDepth);
 
@@ -266,6 +268,7 @@ bool SurroundOptimizer::AddInverseDepthEdge( 	Eigen::Vector3d mPoint3d,
     nFy = pCamera2->m_mK(1 , 1);
     nCx = pCamera2->m_mK(0 , 2) - gROI[0];
     nCy = pCamera2->m_mK(1 , 2) - gROI[1];
+
 
     InverseDepthEdge* pEdge = new InverseDepthEdge();
 	pEdge->BindParameters(nFx,
@@ -294,7 +297,19 @@ bool SurroundOptimizer::AddInverseDepthEdge( 	Eigen::Vector3d mPoint3d,
     pEdge->setId ( m_nEdgeIndex++ );
     pEdge->setRobustKernel(kernel);
 
+
+
+    PriorInvDepthEdge* pPriorEdge = new PriorInvDepthEdge();
+    pPriorEdge->setVertex ( 0, pInverseDepth);
+    pPriorEdge->setMeasurement (nInverseDepth);
+    pPriorEdge->setInformation ( Eigen::Matrix<double,1,1>::Identity() * 1000 );
+    pPriorEdge->setId ( m_nEdgeIndex++ );
+    // pPriorEdge->setRobustKernel(kernel);
+
+
+
     m_iOptimizer.addEdge ( pEdge );	
+    m_iOptimizer.addEdge(pPriorEdge);   
 }
 
 
@@ -343,7 +358,17 @@ bool SurroundOptimizer::AddEdge(	Eigen::Vector3d mPoint3d, int nCameraIndex,
 
 bool SurroundOptimizer::Optimize(){
 	cout << "Edge number" << endl << m_iOptimizer.edges().size() << endl;
+
+
 	m_iOptimizer.initializeOptimization();
+    m_iOptimizer.optimize(10);
+
+    for (auto item : this->m_gInverseDepthVertices){
+        cout << item->Get3DPoint() << endl << endl;
+        
+        item->setFixed(true);
+    }
+
     m_iOptimizer.optimize ( 500 );
 
     //Load poses.

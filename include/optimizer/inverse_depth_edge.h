@@ -102,6 +102,10 @@ public:
  	//Derivatives from the P_i to the inverse depth.
  	Eigen::Vector3d GetDerivatives() const {
  		double nLamda = this->_estimate;
+        // Eigen::Vector3d mPoint = m_mProjectingPose.inverse().rotation_matrix() *  Eigen::Vector3d(   this->m_nNormalized_U,
+        //                                             this->m_nNormalized_V,
+        //                                             1) * (1/nLamda)  + m_mProjectingPose.inverse().translation();
+        // cout << "Point3d is " << endl << mPoint << endl;
  		return -(1/(nLamda * nLamda)) * Eigen::Vector3d(
  				this->m_nNormalized_U,
  				this->m_nNormalized_V,
@@ -150,6 +154,8 @@ class InverseDepthEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
 
             //The coordinate in camera coordinate system.
             Eigen::Vector3d mPoint3d = pPointInverseDepth->Get3DPoint();
+
+
             Eigen::Vector3d mPoint_Camera = pPoseVertex->estimate().map(mPoint3d);
             //Map the point on the image.
             float nU = mPoint_Camera[0] * m_nFx / mPoint_Camera[2] + m_nCx;
@@ -183,7 +189,10 @@ class InverseDepthEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
 
             //The coordinate in camera coordinate system.
             Eigen::Vector3d mPoint3d = pInverseDepth->Get3DPoint();
-            
+
+            // cout << "mPoint3d is " << endl << mPoint3d << endl;
+
+         
 
             Eigen::Vector3d mPoint_Camera = pPoseVertex->estimate().map(mPoint3d);
 
@@ -244,7 +253,7 @@ class InverseDepthEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
             _jacobianOplusXi = jacobian_pixel_uv * jacobian_uv_ksai;
 
 
-            _jacobianOplusXj =  jacobian_pixel_uv * mJacibian_u_q * mRotation * pInverseDepth->GetDerivatives();
+            _jacobianOplusXj = jacobian_pixel_uv * mJacibian_u_q * mRotation * pInverseDepth->GetDerivatives();
         }
 
         virtual bool read(std::istream& in) {}
@@ -272,6 +281,39 @@ class InverseDepthEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
         float m_nCx, m_nCy;
         //Gray image.
         cv::Mat * m_pImage;
+};
+
+
+
+//This is the unary edge, the photometric coefficient is ignored.
+//In this edge, the depth of the point is not optimized.
+class PriorInvDepthEdge : public g2o::BaseUnaryEdge<1 , double , InverseDepthVertex>{
+    public:
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+        //Default Constructor.
+        PriorInvDepthEdge() {}
+
+        virtual void computeError(){
+            //Get the vertex.
+            const InverseDepthVertex * pInvDepthVertex = static_cast<const InverseDepthVertex *>(_vertices[0]);
+            //The coordinate in camera coordinate system.
+            _error(0 , 0) = pInvDepthVertex->estimate() - _measurement;
+            Eigen::Vector3d mPoint3d = pInvDepthVertex->Get3DPoint();
+            // cout << "mPoint3d is " << endl << mPoint3d << endl;
+
+        }
+
+        virtual void linearizeOplus(){
+            Eigen::Matrix<double , 1 , 1> mJacobian;
+            mJacobian(0 , 0) = 1;
+
+            _jacobianOplusXi = mJacobian;
+        }
+
+        virtual bool read(std::istream& in) {}
+        virtual bool write(std::ostream & out) const {}
+
 };
 
 

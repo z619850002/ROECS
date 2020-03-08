@@ -55,6 +55,8 @@ public:
 
 	vector<g2o::VertexSBAPointXYZ *> m_gPointVertices;
 
+	vector<InverseDepthVertex *> m_gInverseDepthVertices;
+
 	//Cameras.
 	Camera * m_pFrontCamera;
 	Camera * m_pLeftCamera;

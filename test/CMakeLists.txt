@@ -20,3 +20,8 @@ TARGET_LINK_LIBRARIES( surround_multi_test dynamic_adjustment)
 
 ADD_EXECUTABLE(variance_test variance_test.cpp)
 TARGET_LINK_LIBRARIES( variance_test dynamic_adjustment)
+
+
+
+ADD_EXECUTABLE(lk_test lk_test.cpp)
+TARGET_LINK_LIBRARIES( lk_test dynamic_adjustment)

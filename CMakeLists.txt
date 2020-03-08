@@ -41,7 +41,7 @@ include_directories(${SUITESPARSE_INCLUDE_DIRS})
 set( THIRD_PARTY_LIBS 
     ${OpenCV_LIBS}
     ${Sophus_LIBRARIES}
-    g2o_core g2o_stuff g2o_types_sba
+    g2o_core g2o_stuff g2o_types_sba g2o_types_slam2d
 )
 
 

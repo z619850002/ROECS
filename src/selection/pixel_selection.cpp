@@ -54,5 +54,7 @@ vector<cv::Point2d> PixelSelection::GetSparsePixels(cv::Mat & mROI){
 			}
 		}
 	}
+
+
 	return gPoints;
 }

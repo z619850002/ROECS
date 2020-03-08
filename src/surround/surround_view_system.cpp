@@ -35,6 +35,12 @@ SurroundView::SurroundView(){
 	this->m_iROI_BR = cv::Rect(ROI_BR_x,ROI_BR_y-100,ROI_BR_w,ROI_BR_h+70);
 	this->m_iROI_RF = cv::Rect(ROI_RF_x,ROI_RF_y,ROI_RF_w,ROI_RF_h+70);
 
+
+	// this->m_iROI_FL = cv::Rect(ROI_FL_x,ROI_FL_y,ROI_FL_w,ROI_FL_h);
+	// this->m_iROI_LB = cv::Rect(ROI_LB_x,ROI_LB_y,ROI_LB_w,ROI_LB_h);
+	// this->m_iROI_BR = cv::Rect(ROI_BR_x,ROI_BR_y,ROI_BR_w,ROI_BR_h);
+	// this->m_iROI_RF = cv::Rect(ROI_RF_x,ROI_RF_y,ROI_RF_w,ROI_RF_h);
+
 	// //Initialize optimizer.
 	// this->m_pOptimizer = new SurroundOptimizer(
 	// 	this->m_pFrontCamera,
@@ -77,6 +83,7 @@ SurroundView::SurroundView(	Camera * pFrontCamera, Camera * pLeftCamera,
 	this->m_iROI_LB = cv::Rect(ROI_LB_x,ROI_LB_y-100,ROI_LB_w,ROI_LB_h+70);
 	this->m_iROI_BR = cv::Rect(ROI_BR_x,ROI_BR_y-100,ROI_BR_w,ROI_BR_h+70);
 	this->m_iROI_RF = cv::Rect(ROI_RF_x,ROI_RF_y,ROI_RF_w,ROI_RF_h+70);
+
 
 
 	this->m_pOptimizer = new SurroundOptimizer(
@@ -636,6 +643,7 @@ bool SurroundView::AddCoupleEdges(int nIndex,
         	gOriginROI_2, 
         	nMeasurement, 
         	&mGrayROI_2);
+
 	}
 }
 
