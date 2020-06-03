@@ -26,7 +26,7 @@ int main(){
 						pRightCamera);
 
 	cout << "Load pairs" << endl;
-	vector<SVPair> gPairs = iLoader.LoadFramePairs(vector<int>{0 , 1, 2  , 3});
+	vector<SVPair> gPairs = iLoader.LoadFramePairs(vector<int>{0 , 1, 2  , 3 , 4});
 
 	SurroundView iSurround(pFrontCamera, pLeftCamera, pBackCamera, pRightCamera);
 
@@ -53,12 +53,13 @@ int main(){
 	cv::waitKey(0);
 
 
+
 	mSurroundView = iSurround.GenerateSurroundView(3, 1000, 1000);
 	cv::imshow("const cv::String &winname", mSurroundView);
 	cv::waitKey(0);
 
 	// iSurround.OptimizePoseWithOneFrame(2);
-	vector<int> gIndices = { 1 , 2  , 3};
+	vector<int> gIndices = { 0 , 1   , 3 };
 	iSurround.OptimizeWithMultiFrame(gIndices);
 
 	mSurroundView = iSurround.GenerateSurroundView(0, 1000, 1000);
@@ -73,11 +74,13 @@ int main(){
 
 	mSurroundView = iSurround.GenerateSurroundView(2, 1000, 1000);
 	cv::imshow("const cv::String &winname", mSurroundView);
+	cv::imwrite("ROECS_2.jpg", mSurroundView);
 	cv::waitKey(0);
 
 
 	mSurroundView = iSurround.GenerateSurroundView(3, 1000, 1000);
 	cv::imshow("const cv::String &winname", mSurroundView);
+	cv::imwrite("ROECS_3.jpg", mSurroundView);
 	cv::waitKey(0);
 
 

@@ -1,3 +1,12 @@
+#include "../include/surround/surround_view_system.h"
+#include "../include/loader/frame_loader.h"
+#include "../include/initializer/initializer.h"
+#include <sstream>
+#include <fstream>
+#include <ostream>
+using namespace std;
+
+
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -93,9 +102,9 @@ void ExtractFeatures(cv::Mat mImage1, cv::Mat mImage2, vector<cv::DMatch> & gMat
     // }
 
     cv::Mat mGoodImage;
-    cv::drawMatches ( mImage1, gKeyPoints1, mImage2, gKeyPoints2, gMatches, mGoodImage );
-    cv::imshow("const cv::String &winname", mGoodImage);
-    cv::waitKey(0);
+    // cv::drawMatches ( mImage1, gKeyPoints1, mImage2, gKeyPoints2, gMatches, mGoodImage );
+    // cv::imshow("const cv::String &winname", mGoodImage);
+    // cv::waitKey(0);
 
 
 }
@@ -142,8 +151,8 @@ void GeneratePointsPair(cv::Mat mBirdseyeView_1, cv::Mat mBirdseyeView_2,
 			);
 	}
 
-	cv::imshow("const cv::String &winname", mConcat);
-	cv::waitKey(0);
+	// cv::imshow("const cv::String &winname", mConcat);
+	// cv::waitKey(0);
 
 	
 }
@@ -278,6 +287,12 @@ double CalculateSigma(cv::Mat mImage1 , cv::Mat mGeneratedImage, cv::Point2f iPo
 				cv::Vec3b mColorPointA = mImage1.at<cv::Vec3b>(v+i , u+i);
 				cv::Vec3b mColorPointB = mGeneratedImage.at<cv::Vec3b>(v+i , u+i);
 
+				if (mColorPointB[0] == 0 && 
+					mColorPointB[1] == 0 && 
+					mColorPointB[2] == 0){
+					continue;
+				}
+
 				if (mColorPointB[0] == 0){
 					mColorPointB[0] = 1;
 				}
@@ -300,6 +315,10 @@ double CalculateSigma(cv::Mat mImage1 , cv::Mat mGeneratedImage, cv::Point2f iPo
 				nTotalSigma += nSigma;
 				nSize++;
 			}
+		}
+
+		if (nSize == 0){
+			return 0;
 		}
 
 		return nTotalSigma / nSize;
@@ -431,25 +450,24 @@ void Culling(cv::Mat & mImage1, cv::Mat & mImage2, int nStartX, int nStartY){
 		}
 	}
 
-	cv::imshow("const cv::String &winname2", mImage1);
-	cv::imwrite("from.jpg" , mImage1);
-	cv::waitKey(0);
-	cv::imshow("const cv::String &winname2", mGeneratedImage);
-	cv::imwrite("generated.jpg" , mGeneratedImage);
-	cv::waitKey(0);
+	// cv::imshow("const cv::String &winname2", mImage1);
+	// // cv::imwrite("from.jpg" , mImage1);
+	// cv::waitKey(0);
+	// cv::imshow("const cv::String &winname2", mGeneratedImage);
+	// // cv::imwrite("generated.jpg" , mGeneratedImage);
+	// cv::waitKey(0);
 
 	cv::imshow("const cv::String &winname", mUnCull);
-	cv::imwrite("uncull.jpg", mUnCull);
+	// cv::imwrite("uncull.jpg", mUnCull);
 	cv::waitKey(0);
 	cv::imshow("const cv::String &winname", mCull);
-	cv::imwrite("cull.jpg", mCull);
+	// cv::imwrite("cull.jpg", mCull);
 	cv::waitKey(0);
 	
 }
 
-
-
 int main(){
+
 	Initializer iInitializer;
 	Camera * pFrontCamera, * pLeftCamera, * pBackCamera, * pRightCamera;
 	iInitializer.InitializeCameras(	pFrontCamera,
@@ -467,158 +485,76 @@ int main(){
 						pRightCamera);
 
 	cout << "Load pairs" << endl;
-	vector<SVPair> gPairs = iLoader.LoadFramePairs(vector<int>{0 , 1 , 2 , 3 , 4 , 5 , 6 , 7 , 8 , 9 , 10});
-
-	SurroundView iSurround(pFrontCamera, pLeftCamera, pBackCamera, pRightCamera);
-
-	cout << "Bind images" << endl;
-	iSurround.BindImagePairs(gPairs);
-
-	cout << "Init K_G" << endl;
-	iSurround.InitK_G(1000, 1000, 0.1, 0.1);
-
-	cout << "Finish init K_G" << endl;
-	// cv::Mat mSurroundView = iSurround.GenerateSurroundView(3, 1000, 1000);
-	// cv::imshow("const cv::String &winname", mSurroundView);
-	// cv::waitKey(0);
+	vector<int> gIndices = {};
+	for (int i=0;i<100;i++){
+		gIndices.push_back(i);
+	}
+	vector<SVPair> gPairs = iLoader.LoadFramePairs(gIndices);
 
 
+	for (int nImageIndex = 35; nImageIndex < 100; nImageIndex++){
+		SurroundView iSurround(pFrontCamera, pLeftCamera, pBackCamera, pRightCamera);
 
-	// mSurroundView = iSurround.GenerateSurroundView(4, 1000, 1000);
-	// cv::imshow("const cv::String &winname", mSurroundView);
-	// cv::waitKey(0);
+		cout << "Bind images" << endl;
+		iSurround.BindImagePairs(gPairs);
 
+		cout << "Init K_G" << endl;
+		iSurround.InitK_G(1000, 1000, 0.1, 0.1);
 
-	cv::Mat mFrontBirdseye = iSurround.GenerateBirdsView(3, 0, 1000, 1000);
-	cv::imshow("const cv::String &winname", mFrontBirdseye);
-	cv::waitKey(0);
+		cout << "Finish init K_G" << endl;
 
-
-	cv::Mat mFrontBirdseye2 = iSurround.GenerateBirdsView(4, 0, 1000, 1000);
-	cv::imshow("const cv::String &winname", mFrontBirdseye2);
-	cv::waitKey(0);
+		
 
 
+		cv::Mat mFrontBirdseye = iSurround.GenerateBirdsView(nImageIndex, 0, 1000, 1000);
+		cv::Mat mFrontBirdseye2 = iSurround.GenerateBirdsView(nImageIndex+1, 0, 1000, 1000);
+		cv::Mat mLeftBirdseye = iSurround.GenerateBirdsView(nImageIndex, 1, 1000, 1000);
+		cv::Mat mLeftBirdseye2 = iSurround.GenerateBirdsView(nImageIndex+1, 1, 1000, 1000);
+		cv::Mat mRightBirdseye = iSurround.GenerateBirdsView(nImageIndex, 3, 1000, 1000);
+		cv::Mat mRightBirdseye2 = iSurround.GenerateBirdsView(nImageIndex+1, 3, 1000, 1000);
+		cv::Mat mBackBirdseye = iSurround.GenerateBirdsView(nImageIndex, 2, 1000, 1000);
+		cv::Mat mBackBirdseye2 = iSurround.GenerateBirdsView(nImageIndex+1, 2, 1000, 1000);
+		
+		cv::Mat mFrontBirdseyeROI_1 = mFrontBirdseye(cv::Rect(0 , 0 , 1000 , 300));
+		cv::Mat mFrontBirdseyeROI_2 = mFrontBirdseye2(cv::Rect(0 , 0 , 1000 , 300));
 
-	cv::Mat mLeftBirdseye = iSurround.GenerateBirdsView(3, 1, 1000, 1000);
-	cv::imshow("const cv::String &winname", mLeftBirdseye);
-	cv::waitKey(0);
+		cv::Mat mLeftBirdseyeROI_1 = mLeftBirdseye(cv::Rect(0 , 0 , 300 , 1000));
+		cv::Mat mLeftBirdseyeROI_2 = mLeftBirdseye2(cv::Rect(0 , 0 , 300 , 1000));
 
 
-	cv::Mat mLeftBirdseye2 = iSurround.GenerateBirdsView(4, 1, 1000, 1000);
-	cv::imshow("const cv::String &winname", mLeftBirdseye2);
-	cv::waitKey(0);
+		cv::Mat mRightBirdseyeROI_1 = mRightBirdseye(cv::Rect(700 , 0 , 300 , 1000));
+		cv::Mat mRightBirdseyeROI_2 = mRightBirdseye2(cv::Rect(700 , 0 , 300 , 1000));
 
 
-
-	cv::Mat mRightBirdseye = iSurround.GenerateBirdsView(3, 3, 1000, 1000);
-	cv::imshow("const cv::String &winname", mRightBirdseye);
-	cv::waitKey(0);
-
-
-	cv::Mat mRightBirdseye2 = iSurround.GenerateBirdsView(4, 3, 1000, 1000);
-	cv::imshow("const cv::String &winname", mRightBirdseye2);
-	cv::waitKey(0);
+		cv::Mat mBackBirdseyeROI_1 = mBackBirdseye(cv::Rect(0 , 700 , 1000 , 300));
+		cv::Mat mBackBirdseyeROI_2 = mBackBirdseye2(cv::Rect(0 , 700 , 1000 , 300));
 
 
 
 
-	cv::Mat mBackBirdseye = iSurround.GenerateBirdsView(3, 2, 1000, 1000);
-	cv::imshow("const cv::String &winname", mBackBirdseye);
-	cv::waitKey(0);
+		Culling(mFrontBirdseyeROI_1, mFrontBirdseyeROI_2, 0 , 0);
 
+		Culling(mLeftBirdseyeROI_1, mLeftBirdseyeROI_2, 0 , 0);
 
-	cv::Mat mBackBirdseye2 = iSurround.GenerateBirdsView(4, 2, 1000, 1000);
-	cv::imshow("const cv::String &winname", mBackBirdseye2);
-	cv::waitKey(0);
+		Culling(mBackBirdseyeROI_1, mBackBirdseyeROI_2, 0 , 700);
 
-
-	// cv::Mat mFrontBirdseye = iSurround.GenerateBirdsView(3, 0, 1000, 1000);
-	// cv::imshow("const cv::String &winname", mFrontBirdseye);
-	// cv::waitKey(0);
-
-
-	// cv::Mat mFrontBirdseye2 = iSurround.GenerateBirdsView(4, 0, 1000, 1000);
-	// cv::imshow("const cv::String &winname", mFrontBirdseye2);
-	// cv::waitKey(0);
-
-
-	cv::Mat mFrontBirdseyeROI_1 = mFrontBirdseye(cv::Rect(0 , 0 , 1000 , 300));
-	cv::Mat mFrontBirdseyeROI_2 = mFrontBirdseye2(cv::Rect(0 , 0 , 1000 , 300));
-
-
-	cv::Mat mLeftBirdseyeROI_1 = mLeftBirdseye(cv::Rect(0 , 0 , 300 , 1000));
-	cv::Mat mLeftBirdseyeROI_2 = mLeftBirdseye2(cv::Rect(0 , 0 , 300 , 1000));
-
-
-	cv::Mat mRightBirdseyeROI_1 = mRightBirdseye(cv::Rect(600 , 0 , 300 , 1000));
-	cv::Mat mRightBirdseyeROI_2 = mRightBirdseye2(cv::Rect(600 , 0 , 300 , 1000));
-
-
-	cv::Mat mBackBirdseyeROI_1 = mBackBirdseye(cv::Rect(0 , 700 , 1000 , 300));
-	cv::Mat mBackBirdseyeROI_2 = mBackBirdseye2(cv::Rect(0 , 700 , 1000 , 300));
-
-
-	// cv::imwrite("Front1.jpg", mFrontBirdseye);
-	// cv::imwrite("Front2.jpg", mFrontBirdseye2);
-
-	// cv::imwrite("Left1_Blur.jpg", mLeftBirdseye);
-	// cv::imwrite("Left2_Blur.jpg", mLeftBirdseye2);
-
-	// cv::imwrite("Back1.jpg", mBackBirdseye);
-	// cv::imwrite("Back2.jpg", mBackBirdseye2);
-
-	// cv::imwrite("Right1_Blur.jpg", mRightBirdseye);
-	// cv::imwrite("Right2_Blur.jpg", mRightBirdseye2);
-
-
-
-	cv::Mat mFrontFisheye_1 , mFrontFisheye_2;
-	mFrontFisheye_1 = gPairs[3].m_pFrontFrame->m_mFisheyeImage;
-	mFrontFisheye_2 = gPairs[4].m_pFrontFrame->m_mFisheyeImage;
+		Culling(mRightBirdseyeROI_1, mRightBirdseyeROI_2, 700 , 0);
 
 
 
 
-	cv::Mat mK, mD;
-	cv::eigen2cv(pFrontCamera->m_mK , mK);
-	cv::eigen2cv(pFrontCamera->m_mD , mD);
+		iInitializer.InitializeCameras(	pFrontCamera,
+									pLeftCamera,
+									pBackCamera,
+									pRightCamera);
+
+
+		pLeftCamera->BlurPose();
+		pRightCamera->BlurPose();
 	
-	
-
-	cv::fisheye::undistortImage(mFrontFisheye_1,mFrontFisheye_1,
-								mK,mD,
-								mK);
-
-	cv::fisheye::undistortImage(mFrontFisheye_2,mFrontFisheye_2,
-								mK,mD,
-								mK);
-
-
-	// cv::imshow("const cv::String &winname", mFrontFisheye_1);
-	// cv::waitKey(0);
-
-	// cv::imshow("const cv::String &winname", mFrontFisheye_2);
-	// cv::waitKey(0);
+	}
 
 	
-
-	Culling(mFrontBirdseyeROI_1, mFrontBirdseyeROI_2, 200 , 0);
-	// Culling(mFrontFisheye_1, mFrontFisheye_2, 200 , 0);
-
-
-	
-
-
 
 	return 0;
 }
-
-
-
-
-
-
-
-
-

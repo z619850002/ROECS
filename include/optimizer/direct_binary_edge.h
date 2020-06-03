@@ -65,10 +65,21 @@ class DirectBinaryEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
             //Abandon pixels on the boundary of the image.
             if (nU-4 < 0 || nU+4 > m_pImage->cols ||
                 nV-4 < 0 || nV+4 > m_pImage->rows ){
-                _error(0 , 0) = 0.0;
+                _error(0 , 0) = 256.0;
                 this->setLevel(1);
             }else{
-                _error(0 , 0) = this->getPixelValue(nU, nV) - _measurement;
+                double nError1 = (this->getPixelValue(nU, nV) - _measurement);
+                double nError2 = (this->getPixelValue(nU-4, nV) - _measurement);
+                double nError3 = (this->getPixelValue(nU+4, nV) - _measurement);
+                double nError4 = (this->getPixelValue(nU, nV-4) - _measurement);
+                double nError5 = (this->getPixelValue(nU, nV+4) - _measurement);
+                double nError6 = (this->getPixelValue(nU-2, nV-2) - _measurement);
+                double nError7 = (this->getPixelValue(nU-2, nV+2) - _measurement);
+                double nError8 = (this->getPixelValue(nU+2, nV-2) - _measurement);
+                double nError9 = (this->getPixelValue(nU+2, nV+2) - _measurement);
+
+                _error(0 , 0) = (nError1 + nError2  + nError3 + nError4 + nError5 + nError6 + nError7 + nError8 + nError9 )/9.0;
+                // _error(0 , 0) = this->getPixelValue(nU, nV) - _measurement;
             }
         }
 
@@ -90,9 +101,9 @@ class DirectBinaryEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
 
             //The coordinate in camera coordinate system.
             Eigen::Vector3d mPoint3d = pPointVertex->estimate();
-            if (mPoint3d[2] * mPoint3d[2] > 0.01){
-                cout << "point 3d " << endl << mPoint3d << endl;
-            }
+            // if (mPoint3d[2] * mPoint3d[2] > 0.01){
+            //     cout << "point 3d " << endl << mPoint3d << endl;
+            // }
 
             Eigen::Vector3d mPoint_Camera = pPoseVertex->estimate().map(mPoint3d);
 
@@ -124,7 +135,13 @@ class DirectBinaryEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
             jacobian_uv_ksai(1 , 5) = -y / (z*z) * m_nFy;
 
             Eigen::Matrix<double , 1 , 2> jacobian_pixel_uv;
+
+
             
+            // jacobian_pixel_uv(0 , 0) = (getPixelValue(u+4, v) - getPixelValue(u-4, v))/8;
+            
+            // jacobian_pixel_uv(0 , 1) = (getPixelValue(u, v+4) - getPixelValue(u, v-4))/8;
+
             jacobian_pixel_uv(0 , 0) = (getPixelValue(u+1, v) - getPixelValue(u-1, v))/2;
             
             jacobian_pixel_uv(0 , 1) = (getPixelValue(u, v+1) - getPixelValue(u, v-1))/2;
@@ -144,6 +161,7 @@ class DirectBinaryEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
             // mJacibian_u_q(1 , 0) = 0.0;
             // mJacibian_u_q(1 , 1) = 10;
             // mJacibian_u_q(1 , 2) = - 10;
+
 
 
             _jacobianOplusXi = jacobian_pixel_uv * jacobian_uv_ksai;

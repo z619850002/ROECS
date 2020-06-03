@@ -1,4 +1,6 @@
 #include "../../include/optimizer/surround_optimizer.h"
+
+#include <fstream>
 #include <cstdlib>
 using namespace std;
 
@@ -16,6 +18,7 @@ SurroundOptimizer::SurroundOptimizer(	Camera * pFrontCamera, Camera * pLeftCamer
     std::unique_ptr<DirectBlock> pSolverPtr (new DirectBlock ( std::move(pLinearSolver) ));
     // g2o::OptimizationAlgorithmGaussNewton* solver = new g2o::OptimizationAlgorithmGaussNewton( solver_ptr ); // G-N
     g2o::OptimizationAlgorithmLevenberg* pSolver = new g2o::OptimizationAlgorithmLevenberg ( std::move(pSolverPtr) ); // L-M
+    // g2o::OptimizationAlgorithmGaussNewton* pSolver = new g2o::OptimizationAlgorithmGaussNewton ( std::move(pSolverPtr) ); // L-M
 	//TODO: These configuration should be adjusted in the future.    
     m_iOptimizer.setAlgorithm ( pSolver );
     m_iOptimizer.setVerbose( true );
@@ -41,6 +44,7 @@ SurroundOptimizer::SurroundOptimizer(	Camera * pFrontCamera, Camera * pLeftCamer
     //Left ID is 1.
     m_pPoseLeft->setId ( 1 );
     m_iOptimizer.addVertex ( m_pPoseLeft );
+    
 
 
     //Add back camera.
@@ -135,9 +139,10 @@ bool SurroundOptimizer::AddFixedBinaryEdge(	Eigen::Vector3d mPoint3d,
     	pPointVertex->setEstimate(Eigen::Vector3d(mPoint3d(0 , 0),
                                          		  mPoint3d(1 , 0),
                                           		  mPoint3d(2 , 0)));
-    	pPointVertex->setMarginalized(true);
+    	// pPointVertex->setMarginalized(true);
     	pPointVertex->setFixed(true);
     	this->m_iOptimizer.addVertex(pPointVertex);
+        this->m_gPointVertices.push_back(pPointVertex);
 
     	//Then create edges.
         vector<Camera *> gpCameras = {
@@ -251,9 +256,9 @@ bool SurroundOptimizer::AddInverseDepthEdge( 	Eigen::Vector3d mPoint3d,
 								  nNormalized_V,
 								  pCamera1->m_mT);
 
-    pInverseDepth->setEstimate(nInverseDepth + ((m_nEdgeIndex%2)-1));
+    pInverseDepth->setEstimate(nInverseDepth);
 
-	// pInverseDepth->setFixed(true);
+	pInverseDepth->setFixed(true);
     this->m_gInverseDepthVertices.push_back(pInverseDepth);
 
 
@@ -275,7 +280,8 @@ bool SurroundOptimizer::AddInverseDepthEdge( 	Eigen::Vector3d mPoint3d,
         nFy,
         nCx,
         nCy,
-        pGrayImage);
+        pGrayImage,
+        nCameraIndex2);
 
 	//Vertices of camera poses.
 	vector<g2o::VertexSE3Expmap*> gpPoseVertices = {
@@ -297,7 +303,7 @@ bool SurroundOptimizer::AddInverseDepthEdge( 	Eigen::Vector3d mPoint3d,
     pEdge->setId ( m_nEdgeIndex++ );
     pEdge->setRobustKernel(kernel);
 
-
+    this->m_gInverseDepthEdges.push_back(pEdge);
 
     PriorInvDepthEdge* pPriorEdge = new PriorInvDepthEdge();
     pPriorEdge->setVertex ( 0, pInverseDepth);
@@ -353,6 +359,7 @@ bool SurroundOptimizer::AddEdge(	Eigen::Vector3d mPoint3d, int nCameraIndex,
         pEdge->setMeasurement (nMeasurement);
         pEdge->setInformation ( Eigen::Matrix<double,1,1>::Identity() );
         pEdge->setId ( m_nEdgeIndex++ );
+
         m_iOptimizer.addEdge ( pEdge );	
 }
 
@@ -361,23 +368,50 @@ bool SurroundOptimizer::Optimize(){
 
 
 	m_iOptimizer.initializeOptimization();
-    m_iOptimizer.optimize(10);
+    
 
-    for (auto item : this->m_gInverseDepthVertices){
-        cout << item->Get3DPoint() << endl << endl;
-        
-        item->setFixed(true);
+
+    m_iOptimizer.optimize(10);
+    m_iOptimizer.optimize(100);
+
+    // for (int i=0;i<200;i++){
+    //     m_iOptimizer.optimize(1);
+
+    //     cout << "Front Pose: " << endl <<  m_pPoseFront->estimate() << endl;
+    //     cout << "Left Pose: " << endl <<  m_pPoseLeft->estimate() << endl;
+    //     cout << "Back Pose: " << endl <<  m_pPoseBack->estimate() << endl;
+    //     cout << "Right Pose: " << endl <<  m_pPoseRight->estimate() << endl;
+
+
+    // }
+
+    
+     // Left
+    for (auto item : this->m_gInverseDepthEdges){
+        double nError = item->GetError();
+        if (nError * nError > 225){
+
+            InverseDepthVertex * pPointInverseDepth = item->GetDepthVertex();
+            pPointInverseDepth->setFixed(false);
+        }
     }
 
-    m_iOptimizer.optimize ( 500 );
+
+    // m_iOptimizer.initializeOptimization();
+    // m_iOptimizer.optimize ( 50 );
 
     //Load poses.
     //Front.
     Eigen::Isometry3d mTcw_Front = m_pPoseFront->estimate();
     m_pFrontCamera->m_mT = Sophus::SE3(mTcw_Front.rotation() , mTcw_Front.translation());
 
+
+
+
     //Left
     Eigen::Isometry3d mTcw_Left = m_pPoseLeft->estimate();
+    
+
     m_pLeftCamera->m_mT = Sophus::SE3(mTcw_Left.rotation() , mTcw_Left.translation());
 
     //Back.
@@ -388,3 +422,94 @@ bool SurroundOptimizer::Optimize(){
     Eigen::Isometry3d mTcw_Right = m_pPoseRight->estimate();
     m_pRightCamera->m_mT = Sophus::SE3(mTcw_Right.rotation() , mTcw_Right.translation());
 }
+
+
+
+
+
+
+vector<vector<Sophus::SE3>> SurroundOptimizer::Optimize(ofstream & fOutFile){
+    cout << "Edge number" << endl << m_iOptimizer.edges().size() << endl;
+
+
+    m_iOptimizer.initializeOptimization();
+    
+
+
+    // m_iOptimizer.optimize(10);
+    // m_iOptimizer.optimize(300);
+
+
+    // fOutFile << "Iteration: " << 0 << endl;
+    // fOutFile << "Front Pose: " << endl <<  m_pPoseFront->estimate() << endl;
+    // fOutFile << "Left Pose: " << endl <<  m_pPoseLeft->estimate() << endl;
+    // fOutFile << "Back Pose: " << endl <<  m_pPoseBack->estimate() << endl;
+    // fOutFile << "Right Pose: " << endl <<  m_pPoseRight->estimate() << endl;
+
+
+    vector<vector<Sophus::SE3 >> gPoses;
+    for (int i=0;i<4;i++){
+        gPoses.push_back(vector<Sophus::SE3>());
+    }
+
+    for (int i=0;i<100;i++){
+        m_iOptimizer.optimize(1);
+
+
+
+
+        gPoses[0].push_back(Sophus::SE3(m_pPoseFront->estimate().rotation() , m_pPoseFront->estimate().translation()));
+        gPoses[1].push_back(Sophus::SE3(m_pPoseLeft->estimate().rotation() , m_pPoseLeft->estimate().translation()));
+        gPoses[2].push_back(Sophus::SE3(m_pPoseBack->estimate().rotation() , m_pPoseBack->estimate().translation()));
+        gPoses[3].push_back(Sophus::SE3(m_pPoseRight->estimate().rotation() , m_pPoseRight->estimate().translation()));
+
+        // fOutFile << "Identityeration: " << i+1 << endl;
+        // fOutFile << "Front Pose: " << endl <<  m_pPoseFront->estimate() << endl;
+        // fOutFile << "Left Pose: " << endl <<  m_pPoseLeft->estimate() << endl;
+        // fOutFile << "Back Pose: " << endl <<  m_pPoseBack->estimate() << endl;
+        // fOutFile << "Right Pose: " << endl <<  m_pPoseRight->estimate() << endl;
+
+
+    }
+
+    
+     // Left
+    for (auto item : this->m_gInverseDepthEdges){
+        double nError = item->GetError();
+        if (nError * nError > 225){
+
+            InverseDepthVertex * pPointInverseDepth = item->GetDepthVertex();
+            pPointInverseDepth->setFixed(false);
+        }
+    }
+
+
+    // m_iOptimizer.initializeOptimization();
+    // m_iOptimizer.optimize ( 50 );
+
+    //Load poses.
+    //Front.
+    Eigen::Isometry3d mTcw_Front = m_pPoseFront->estimate();
+    m_pFrontCamera->m_mT = Sophus::SE3(mTcw_Front.rotation() , mTcw_Front.translation());
+
+
+
+
+    //Left
+    Eigen::Isometry3d mTcw_Left = m_pPoseLeft->estimate();
+    
+
+    m_pLeftCamera->m_mT = Sophus::SE3(mTcw_Left.rotation() , mTcw_Left.translation());
+
+    //Back.
+    Eigen::Isometry3d mTcw_Back = m_pPoseBack->estimate();
+    m_pBackCamera->m_mT = Sophus::SE3(mTcw_Back.rotation() , mTcw_Back.translation());
+
+    //Right.
+    Eigen::Isometry3d mTcw_Right = m_pPoseRight->estimate();
+    m_pRightCamera->m_mT = Sophus::SE3(mTcw_Right.rotation() , mTcw_Right.translation());
+
+
+    return gPoses;
+}
+

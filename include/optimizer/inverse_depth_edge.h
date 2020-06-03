@@ -137,17 +137,24 @@ class InverseDepthEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
         
 
         void BindParameters(float nFx , float nFy , 
-                        	float nCx , float nCy , cv::Mat * pImage){
+                        	float nCx , float nCy , cv::Mat * pImage , int nType){
             this->m_pImage = pImage;
             this->m_nFx = nFx;
             this->m_nFy = nFy;
             this->m_nCx = nCx;
             this->m_nCy = nCy;
 
+            this->m_nCameraType = nType;
+
         }
 
-        virtual void computeError(){
-            //Get the vertex.
+        InverseDepthVertex * GetDepthVertex(){
+            InverseDepthVertex * pPointInverseDepth = static_cast<InverseDepthVertex *>(_vertices[1]);
+            return pPointInverseDepth;
+        }
+
+        double GetError(){
+    //Get the vertex.
             const g2o::VertexSE3Expmap * pPoseVertex = static_cast<const g2o::VertexSE3Expmap *>(_vertices[0]);
             //The inverse depth vertex. It can generate the 3d point.
             const InverseDepthVertex * pPointInverseDepth = static_cast<const InverseDepthVertex *>(_vertices[1]);
@@ -160,12 +167,68 @@ class InverseDepthEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
             //Map the point on the image.
             float nU = mPoint_Camera[0] * m_nFx / mPoint_Camera[2] + m_nCx;
             float nV = mPoint_Camera[1] * m_nFy / mPoint_Camera[2] + m_nCy;
+
             //Abandon pixels on the boundary of the image.
             if (nU-4 < 0 || nU+4 > m_pImage->cols ||
                 nV-4 < 0 || nV+4 > m_pImage->rows ){
-                _error(0 , 0) = 0.0;
+                return 0.0;
+            }else{
+                double nError1 = (this->getPixelValue(nU, nV) - _measurement);
+                double nError2 = (this->getPixelValue(nU-4, nV) - _measurement);
+                double nError3 = (this->getPixelValue(nU+4, nV) - _measurement);
+                double nError4 = (this->getPixelValue(nU, nV-4) - _measurement);
+                double nError5 = (this->getPixelValue(nU, nV+4) - _measurement);
+                double nError6 = (this->getPixelValue(nU-2, nV-2) - _measurement);
+                double nError7 = (this->getPixelValue(nU-2, nV+2) - _measurement);
+                double nError8 = (this->getPixelValue(nU+2, nV-2) - _measurement);
+                double nError9 = (this->getPixelValue(nU+2, nV+2) - _measurement);
+
+                return (nError1 + nError2  + nError3 + nError4 + nError5 + nError6 + nError7 + nError8 + nError9 )/9.0;
+                
+                // _error(0 , 0) = this->getPixelValue(nU, nV) - _measurement;
+            }
+        }
+
+        virtual void computeError(){
+
+
+
+            //Get the vertex.
+            const g2o::VertexSE3Expmap * pPoseVertex = static_cast<const g2o::VertexSE3Expmap *>(_vertices[0]);
+
+            // cout << "Camera Index: " << this->m_nCameraType << " , Camera Pose: " << pPoseVertex->estimate() << endl;
+
+
+            //The inverse depth vertex. It can generate the 3d point.
+            const InverseDepthVertex * pPointInverseDepth = static_cast<const InverseDepthVertex *>(_vertices[1]);
+
+            //The coordinate in camera coordinate system.
+            Eigen::Vector3d mPoint3d = pPointInverseDepth->Get3DPoint();
+
+
+            Eigen::Vector3d mPoint_Camera = pPoseVertex->estimate().map(mPoint3d);
+            //Map the point on the image.
+            float nU = mPoint_Camera[0] * m_nFx / mPoint_Camera[2] + m_nCx;
+            float nV = mPoint_Camera[1] * m_nFy / mPoint_Camera[2] + m_nCy;
+
+            //Abandon pixels on the boundary of the image.
+            if (nU-4 < 0 || nU+4 > m_pImage->cols ||
+                nV-4 < 0 || nV+4 > m_pImage->rows ){
+                _error(0 , 0) = 256;
                 this->setLevel(1);
             }else{
+                double nError1 = (this->getPixelValue(nU, nV) - _measurement);
+                double nError2 = (this->getPixelValue(nU-4, nV) - _measurement);
+                double nError3 = (this->getPixelValue(nU+4, nV) - _measurement);
+                double nError4 = (this->getPixelValue(nU, nV-4) - _measurement);
+                double nError5 = (this->getPixelValue(nU, nV+4) - _measurement);
+                double nError6 = (this->getPixelValue(nU-2, nV-2) - _measurement);
+                double nError7 = (this->getPixelValue(nU-2, nV+2) - _measurement);
+                double nError8 = (this->getPixelValue(nU+2, nV-2) - _measurement);
+                double nError9 = (this->getPixelValue(nU+2, nV+2) - _measurement);
+
+                // _error(0 , 0) = (nError1 + nError2  + nError3 + nError4 + nError5 + nError6 + nError7 + nError8 + nError9 )/9.0;
+                
                 _error(0 , 0) = this->getPixelValue(nU, nV) - _measurement;
             }
         }
@@ -232,9 +295,9 @@ class InverseDepthEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
 
             Eigen::Matrix<double , 1 , 2> jacobian_pixel_uv;
             
-            jacobian_pixel_uv(0 , 0) = (getPixelValue(u+1, v) - getPixelValue(u-1, v))/2;
+            jacobian_pixel_uv(0 , 0) = (getPixelValue(u+2, v) - getPixelValue(u-2, v))/4;
             
-            jacobian_pixel_uv(0 , 1) = (getPixelValue(u, v+1) - getPixelValue(u, v-1))/2;
+            jacobian_pixel_uv(0 , 1) = (getPixelValue(u, v+2) - getPixelValue(u, v-2))/4;
 
 
             Eigen::Matrix<double , 2 , 3> mJacibian_u_q;
@@ -281,6 +344,9 @@ class InverseDepthEdge : public g2o::BaseBinaryEdge<1 , double , g2o::VertexSE3E
         float m_nCx, m_nCy;
         //Gray image.
         cv::Mat * m_pImage;
+
+        //0-3 corresponding to F-R
+        int m_nCameraType;
 };
 
 

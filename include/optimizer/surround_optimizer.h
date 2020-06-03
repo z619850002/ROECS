@@ -42,6 +42,8 @@ public:
 
 	bool Optimize();
 
+	vector<vector<Sophus::SE3>> Optimize(ofstream & fOutFile);
+
 
 	//The optimizer.
 	g2o::SparseOptimizer m_iOptimizer;
@@ -57,6 +59,8 @@ public:
 
 	vector<InverseDepthVertex *> m_gInverseDepthVertices;
 
+	vector<InverseDepthEdge *> m_gInverseDepthEdges;
+
 	//Cameras.
 	Camera * m_pFrontCamera;
 	Camera * m_pLeftCamera;
@@ -64,6 +68,7 @@ public:
 	Camera * m_pRightCamera;
 
 	int m_nEdgeIndex;
+
 	
 };
 

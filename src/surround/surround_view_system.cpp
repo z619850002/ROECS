@@ -3,6 +3,49 @@
 
 using namespace std;
 
+cv::Mat DrawPoints(cv::Mat mImage , vector<cv::Point2d> gPoints){
+	cv::Mat mImageDraw = mImage.clone();
+
+	int nWidth = mImageDraw.size().width;
+	int nHeight = mImageDraw.size().height;
+
+	for (auto iOriginPoint : gPoints){
+		for (int i=-2;i<=2;i++){
+			for (int j=-2;j<=2;j++){
+				if (iOriginPoint.x + i >=0 && iOriginPoint.x + i <nWidth && 
+					iOriginPoint.y + j >=0 && iOriginPoint.y + j < nHeight){
+					cv::Point2d iPoint(iOriginPoint.x + i , iOriginPoint.y + j);
+					// double nDistance = sqrt( (iPoint.x / (double)nWidth) * (iPoint.x / (double)nWidth) +
+				 // 						 (iPoint.y / (double)nHeight) * (iPoint.y / (double)nHeight))/sqrt(2);
+				double nDistance = sqrt( (iOriginPoint.x / (double)nWidth) * (iOriginPoint.x / (double)nWidth) +
+				 						 ((nHeight - iOriginPoint.y) / (double)nHeight) * ((nHeight - iOriginPoint.y) / (double)nHeight))/sqrt(2) ;
+
+				double nDistance2 = sqrt( ((iOriginPoint.x - nWidth/2) / (double)(nWidth/2)) * ((iOriginPoint.x- nWidth/2) / (double)(nWidth/2)) +
+				 						 ((nHeight/2 - iOriginPoint.y) / (double)(nHeight/2)) * ((nHeight/2 - iOriginPoint.y) / (double)(nHeight/2)))/sqrt(2);
+
+					// if (iOriginPoint.x < 10 && iOriginPoint.y < 10){
+					// 	cout << "Distance: " << nDistance2 << endl;
+					
+					// }
+					// if (nDistance >=2){
+					// 	nDistance = nDistance-2;
+					// } else if (nDistance >= 1){
+					// 	nDistance = 2 - nDistance;
+					// }
+					int nBlue = (int)(255.0 * nDistance);
+					int nRed = (int)(255.0 * (1-nDistance));
+					int nGreen = (int)(255.0 * (1-nDistance2)) ;
+					mImageDraw.at<cv::Vec3b>(iPoint.y , iPoint.x) = cv::Vec3b(nBlue , nGreen , nRed);					
+				}
+				
+			}
+		}
+
+	}
+	return mImageDraw;
+
+}
+
 
 
 
@@ -31,9 +74,9 @@ SurroundView::SurroundView(){
 	int ROI_RF_h = 200;
 	
 	this->m_iROI_FL = cv::Rect(ROI_FL_x-50,ROI_FL_y,ROI_FL_w,ROI_FL_h+70);
-	this->m_iROI_LB = cv::Rect(ROI_LB_x,ROI_LB_y-100,ROI_LB_w,ROI_LB_h+70);
+	this->m_iROI_LB = cv::Rect(ROI_LB_x - 50,ROI_LB_y-100,ROI_LB_w,ROI_LB_h+70);
 	this->m_iROI_BR = cv::Rect(ROI_BR_x,ROI_BR_y-100,ROI_BR_w,ROI_BR_h+70);
-	this->m_iROI_RF = cv::Rect(ROI_RF_x,ROI_RF_y,ROI_RF_w,ROI_RF_h+70);
+	this->m_iROI_RF = cv::Rect(ROI_RF_x,ROI_RF_y,ROI_RF_w + 100,ROI_RF_h+70);
 
 
 	// this->m_iROI_FL = cv::Rect(ROI_FL_x,ROI_FL_y,ROI_FL_w,ROI_FL_h);
@@ -80,9 +123,9 @@ SurroundView::SurroundView(	Camera * pFrontCamera, Camera * pLeftCamera,
 	int ROI_RF_h = 200;
 	
 	this->m_iROI_FL = cv::Rect(ROI_FL_x-50,ROI_FL_y,ROI_FL_w,ROI_FL_h+70);
-	this->m_iROI_LB = cv::Rect(ROI_LB_x,ROI_LB_y-100,ROI_LB_w,ROI_LB_h+70);
+	this->m_iROI_LB = cv::Rect(ROI_LB_x - 50,ROI_LB_y-100,ROI_LB_w,ROI_LB_h+70);
 	this->m_iROI_BR = cv::Rect(ROI_BR_x,ROI_BR_y-100,ROI_BR_w,ROI_BR_h+70);
-	this->m_iROI_RF = cv::Rect(ROI_RF_x,ROI_RF_y,ROI_RF_w,ROI_RF_h+70);
+	this->m_iROI_RF = cv::Rect(ROI_RF_x,ROI_RF_y,ROI_RF_w + 100,ROI_RF_h+70);
 
 
 
@@ -503,6 +546,32 @@ bool SurroundView::AddEdge(int nIndex, int nCameraIndex,
 	}	
 }
 
+// void CalculateTransormation(cv::Mat mROI_1, cv::Mat mROI_2 , double & nCoef  , double & nTranslation){
+// 	int nWidth = mROI_1.size().width;
+// 	int nHeight = mROI_1.size().height;
+// 	cv::Mat mA, mb;
+// 	bool bFirst = true;
+// 	mA = cv::Mat::zeros(nWidth * nHeight , 2, CV_64FC1);
+// 	mb = cv::Mat::zeros(nWidth * nHeight , 1, CV_64FC1);
+
+// 	int nSize = 0;
+// 	for (int u=0;u<nWidth;u++){
+// 		for (int v=0;v<nHeight;v++){
+// 			if (fabs(mROI_1.at<double>(v , u) - mROI_2.at<double>(v , u)) <30){
+// 				mA.at<double>(nSize , 0) = mROI_1.at<double>(v , u);
+// 				mA.at<double>(nSize , 1) = 1;
+// 				mb.at<double>(nSize , 0) = mROI_2.at<double>(v , u);
+// 				nSize++;
+// 			}
+// 		}
+// 	}
+// 	cout << "nSize is " << nSize << endl;
+// 	mA = mA.rowRange(0, nSize);
+// 	mb = mb.rowRange(0, nSize);
+// 	cout << "Res is " << (mA.t() * mA).inv() * mA.t() * mb << endl;	
+// }
+
+
 
 bool SurroundView::AddCoupleEdges(int nIndex, 
 					int nCameraIndex_1, int nCameraIndex_2,
@@ -576,11 +645,18 @@ bool SurroundView::AddCoupleEdges(int nIndex,
 
 	//Get the coef to eliminate the affect of exposure time.
 	double nCoef = cv::mean(mBirdseyeGray_2).val[0]/cv::mean(mBirdseyeGray_1).val[0];
+	// double nCoe , nB;
+	// CalculateTransormation(mBirdseyeGray_1, mBirdseyeGray_2, nCoe, nB);
+	// cout << "Coef is " << nCoef << endl;
 
 	PixelSelection iSelection;
+	// vector<cv::Point2d> gPoints = iSelection.GetPixels(mBirdseyeGray_1 , nCameraIndex_2, nCameraIndex_1);
 	vector<cv::Point2d> gPoints = iSelection.GetPixels(mBirdseyeGray_1);
 	
-
+	cout << "Edge size " << gPoints.size() << endl;
+	// if (gPoints.size() < 2000){
+	// 	return false;
+	// }
 	//Add edges in the right region.
 	for (cv::Point2d iPoint2d : gPoints){
 		int u = iPoint2d.x , v = iPoint2d.y;
@@ -649,6 +725,191 @@ bool SurroundView::AddCoupleEdges(int nIndex,
 
 
 
+bool SurroundView::AddCullingEdges(int nIndex, 
+					int nCameraIndex_1, int nCameraIndex_2,
+					vector<cv::Mat> & gSurroundViews,
+					vector<cv::Mat> & gNextSVs,
+					cv::Mat & mGrayROI_1,
+					cv::Mat & mGrayROI_2){
+	//Check if 2 cameras are neighbourhood.
+	int nCheck = nCameraIndex_1-nCameraIndex_2;
+	if (nCheck*nCheck == 4){
+		cout << "2 cameras are not neighbourhood!" << endl;
+		return false;
+	}
+
+	//The projection is from 1 to 2.
+	cv::Mat mSurroundView_1, mSurroundView_2;
+	
+
+	//Used to transfer surround-view coordinate to ground coordinate
+	cv::Mat mK_G_inv = this->m_mK_G.inv();
+	cv::Mat mK_G_Augment;
+	cv::vconcat( mK_G_inv.rowRange(0 , 2) , cv::Mat::zeros(1 , 3 , CV_64FC1) , mK_G_Augment);
+	cv::vconcat( mK_G_Augment , mK_G_inv.rowRange(2 , 3) , mK_G_Augment);
+
+	//Generate ROI on original images.
+	cv::Mat mOriginROI_1, mOriginROI_2;
+	vector<int> gOriginROI_1, gOriginROI_2;
+	//Get the ROI on original image and on birds-eye image.
+	vector<cv::Rect> gBirdROIs = {m_iROI_FL, m_iROI_LB, m_iROI_BR, m_iROI_RF};
+	//Use the right index to get the ROI.
+	cv::Rect iBirdsROI;
+	//Get the ROI.
+	if (nCameraIndex_1 - nCameraIndex_2 == 1 ||
+		nCameraIndex_1 - nCameraIndex_2 == -3 ){
+		//Left is 1, right is 2.
+		// index_1 = 1 , 2 , 3 , 0
+		// index_2 = 0 , 1 , 2 , 3
+		GetCoupleROI(nIndex, nCameraIndex_1, nCameraIndex_2,
+					 mOriginROI_1, mOriginROI_2,
+				 	 gOriginROI_1, gOriginROI_2);
+		iBirdsROI = gBirdROIs[nCameraIndex_2];
+	}else if (nCameraIndex_1 - nCameraIndex_2 == -1 ||
+			  nCameraIndex_1 - nCameraIndex_2 == 3 ){
+		//Left is 2, right is 1.
+		// index_1 = 0 , 1 , 2 , 3
+		// index_2 = 1 , 2 , 3 , 0
+		GetCoupleROI(nIndex, nCameraIndex_2, nCameraIndex_1,
+					 mOriginROI_2, mOriginROI_1,
+				 	 gOriginROI_2, gOriginROI_1);
+		iBirdsROI = gBirdROIs[nCameraIndex_1];
+	}else{
+		cout << "Wrong ROI pairs!" << endl;
+		return false;
+	}
+	
+	//Construct gray image.
+    cv::cvtColor(mOriginROI_1,mGrayROI_1,cv::COLOR_BGR2GRAY);
+    cv::cvtColor(mOriginROI_2, mGrayROI_2, cv::COLOR_BGR2GRAY);
+
+	//The ROI on birds-eye view of this camera.
+	//Used in computing the coef.
+	//Get the ROI.
+	cv::Mat mBirdseyeROI_1 = gSurroundViews[nCameraIndex_1](iBirdsROI);
+	cv::Mat mBirdseyeROI_2 = gSurroundViews[nCameraIndex_2](iBirdsROI);
+
+	//Convert to grayscale.
+	cv::Mat mBirdseyeGray_1, mBirdseyeGray_2;
+    cv::cvtColor(mBirdseyeROI_1, mBirdseyeGray_1, cv::COLOR_BGR2GRAY);
+	cv::cvtColor(mBirdseyeROI_2, mBirdseyeGray_2, cv::COLOR_BGR2GRAY);
+	mBirdseyeGray_1.convertTo(mBirdseyeGray_1, CV_64FC1);
+	mBirdseyeGray_2.convertTo(mBirdseyeGray_2, CV_64FC1);
+
+	//Get the coef to eliminate the affect of exposure time.
+	double nCoef = cv::mean(mBirdseyeGray_2).val[0]/cv::mean(mBirdseyeGray_1).val[0];
+
+	PixelSelection iSelection;
+	// vector<cv::Point2d> gPoints = iSelection.GetPixels(mBirdseyeGray_1 , nCameraIndex_2, nCameraIndex_1);
+	// vector<cv::Point2d> gPoints = iSelection.GetPixels(mBirdseyeGray_1);
+	cv::Rect iEstimateROI;
+	switch(nCameraIndex_2){
+		case 0:{
+			iEstimateROI = cv::Rect(0 , 0 , 1000 , 350);
+			break;
+		}
+		case 1:{
+			iEstimateROI = cv::Rect(0 , 0 , 350 , 1000);
+			break;	
+		}
+		case 2:{
+			iEstimateROI = cv::Rect(0 , 650 , 1000 , 350);
+			break;		
+		}
+		case 3:{
+			iEstimateROI = cv::Rect(650 , 0 , 350 , 1000);
+			break;			
+		}
+		default: break;
+	}
+
+	cv::Mat mEstimateSV1, mEstimateSV2;
+	mEstimateSV1 =  gSurroundViews[nCameraIndex_2](iEstimateROI);
+	mEstimateSV2 =  gNextSVs[nCameraIndex_2](iEstimateROI);
+
+	cv::Rect iBirdsEstimateROI( iBirdsROI.x - iEstimateROI.x,
+								iBirdsROI.y - iEstimateROI.y,
+								iBirdsROI.width,
+								iBirdsROI.height);
+	
+	vector<cv::Point2d> gPoints = iSelection.GetCullingPixels(mBirdseyeGray_1,
+												 			  mEstimateSV1,
+												 			  mEstimateSV2,
+												 			  iBirdsEstimateROI);
+	vector<cv::Point2d> gPoints_2 = iSelection.GetPixels(mBirdseyeGray_1);
+
+	if (gPoints_2.size() != gPoints.size()){
+		// cv::imshow("Culling", gSurroundViews[nCameraIndex_1]);
+		// cv::waitKey(0);
+
+		cv::Mat mBirdseyeROI_1_clone1 = DrawPoints(mBirdseyeROI_1, gPoints);
+		cv::Mat mBirdseyeROI_1_clone2 = DrawPoints(mBirdseyeROI_1, gPoints_2);
+
+		// for (auto item : gPoints){
+		// 	cv::circle(mBirdseyeROI_1_clone1, item, 3, cv::Scalar(100 , 0 , 0));
+		// }
+		// for (auto item : gPoints_2){
+		// 	cv::circle(mBirdseyeROI_1_clone2, item, 3, cv::Scalar(100 , 0 , 0));
+		// }
+		// cv::imshow("Culling", mBirdseyeROI_1);
+		stringstream ss;
+		ss << nIndex << "_" << nCameraIndex_1 << "_" << nCameraIndex_2;
+		string aTag = "";
+		ss >> aTag;
+		cv::imwrite("./culling/culling_ROI_" + aTag + "_c.jpg", mBirdseyeROI_1_clone1);
+		cv::imwrite("./culling/culling_ROI_" + aTag + "_g.jpg", mBirdseyeROI_1_clone2);
+		cv::waitKey(30);	
+	}
+	
+
+	cout << "Edge size " << gPoints.size() << endl;
+	// if (gPoints.size() < 2000){
+	// 	return false;
+	// }
+	//Add edges in the right region.
+	for (cv::Point2d iPoint2d : gPoints){
+		int u = iPoint2d.x , v = iPoint2d.y;
+		//Get the surround-view coordinate of the point.
+		int nU = u + iBirdsROI.x;
+		int nV = v + iBirdsROI.y;
+		cv::Mat mp_surround = (cv::Mat_<double>(3 , 1) << nU, nV, 1);
+		//Convert surround-view coordinate to ground coordinate.
+		cv::Mat mP_G = mK_G_Augment * mp_surround;
+
+
+        Eigen::Vector3d mPoint3d(mP_G.at<double>(0 , 0),
+        						 mP_G.at<double>(1 , 0),
+        						 mP_G.at<double>(2 , 0));
+
+
+        double x = mPoint3d[0];
+        double y = mPoint3d[1];
+        double z = mPoint3d[2];
+
+        vector<Camera *> gpCameras = {
+        	this->m_pFrontCamera,
+        	this->m_pLeftCamera,
+        	this->m_pBackCamera,
+        	this->m_pRightCamera
+        };
+
+
+        double nMeasurement = mBirdseyeGray_1.at<double>(v , u) * nCoef;
+        //From 1 to 2
+
+        this->m_pOptimizer->AddInverseDepthEdge(
+        	mPoint3d,
+        	nCameraIndex_1,
+        	nCameraIndex_2,
+        	gOriginROI_2, 
+        	nMeasurement, 
+        	&mGrayROI_2);
+
+	}
+}
+
+
+
 
 bool SurroundView::OptimizePoseWithOneFrame(int nIndex){
 	//Generate birds-eye view image.
@@ -703,11 +964,99 @@ bool SurroundView::OptimizePoseWithOneFrame(int nIndex){
 	
 	// cout << "mGrayROI_Right size " << endl << mGrayROI_Right.rows << "*" << mGrayROI_Right.cols << endl; 
 
-	this->m_pOptimizer->Optimize();
+	ofstream fOutFile("../data/info.txt");
+	this->m_pOptimizer->Optimize(fOutFile);
 }
 
 
 bool SurroundView::OptimizeWithMultiFrame(vector<int> gIndices){
+	vector<cv::Mat> gGrayROI_Right, gGrayROI_Left;
+	vector<cv::Mat> gGrayROI_Right2, gGrayROI_Left2;
+
+
+	vector<cv::Mat> gGrayROI_FL_1, gGrayROI_FL_2;
+	vector<cv::Mat> gGrayROI_BL_1, gGrayROI_BL_2;
+	vector<cv::Mat> gGrayROI_FR_1, gGrayROI_FR_2;
+	vector<cv::Mat> gGrayROI_BR_1, gGrayROI_BR_2;
+
+
+	
+	for (int i=0;i<gIndices.size();i++){
+		cv::Mat mGrayROI_FL_1, mGrayROI_FL_2;
+		cv::Mat mGrayROI_BL_1, mGrayROI_BL_2;
+		cv::Mat mGrayROI_FR_1, mGrayROI_FR_2;
+		cv::Mat mGrayROI_BR_1, mGrayROI_BR_2;
+
+		gGrayROI_FL_1.push_back(mGrayROI_FL_1);
+		gGrayROI_FL_2.push_back(mGrayROI_FL_2);
+
+		gGrayROI_BL_1.push_back(mGrayROI_BL_1);
+		gGrayROI_BL_2.push_back(mGrayROI_BL_2);
+
+		gGrayROI_FR_1.push_back(mGrayROI_FR_1);
+		gGrayROI_FR_2.push_back(mGrayROI_FR_2);
+
+		gGrayROI_BR_1.push_back(mGrayROI_BR_1);
+		gGrayROI_BR_2.push_back(mGrayROI_BR_2);
+	}
+
+
+	for (int i=0;i<gIndices.size();i++){
+		int nIndex = gIndices[i];
+		cout << "Index is " << nIndex << endl;
+		cv::Mat mSurroundView_Front = GenerateBirdsView(nIndex, 0,  1000, 1000);
+		cv::Mat mSurroundView_Left = GenerateBirdsView(nIndex, 1,  1000, 1000);
+		cv::Mat mSurroundView_Back = GenerateBirdsView(nIndex, 2,  1000, 1000);
+		cv::Mat mSurroundView_Right = GenerateBirdsView(nIndex, 3,  1000, 1000);
+
+		vector<cv::Mat> gSurroundViews = {
+			mSurroundView_Front,
+			mSurroundView_Left,
+			mSurroundView_Back,
+			mSurroundView_Right
+		};
+
+
+		//FL
+		this->AddCoupleEdges(nIndex,
+							 0, 1,
+							 gSurroundViews, 
+							 gGrayROI_FL_1[i],
+							 gGrayROI_FL_2[i]);
+
+
+		//BL
+		this->AddCoupleEdges(nIndex,
+							 2, 1,
+							 gSurroundViews, 
+							 gGrayROI_BL_1[i], 
+							 gGrayROI_BL_2[i]);
+
+		//FR
+		this->AddCoupleEdges(nIndex,
+							 0, 3,
+							 gSurroundViews, 
+							 gGrayROI_FR_1[i], 
+							 gGrayROI_FR_2[i]);
+
+		//BR
+		this->AddCoupleEdges(nIndex,
+							 2, 3,
+							 gSurroundViews, 
+							 gGrayROI_BR_1[i],
+							 gGrayROI_BR_2[i]);
+
+
+		
+	}
+	ofstream fOutFile("../data/info.txt");
+	this->m_pOptimizer->Optimize(fOutFile);
+}
+
+
+
+
+bool SurroundView::OptimizeWithCulling(vector<int> gIndices){
 	vector<cv::Mat> gGrayROI_Right, gGrayROI_Left;
 	vector<cv::Mat> gGrayROI_Right2, gGrayROI_Left2;
 
@@ -746,6 +1095,13 @@ bool SurroundView::OptimizeWithMultiFrame(vector<int> gIndices){
 		cv::Mat mSurroundView_Back = GenerateBirdsView(nIndex, 2,  1000, 1000);
 		cv::Mat mSurroundView_Right = GenerateBirdsView(nIndex, 3,  1000, 1000);
 
+		cv::Mat mNextSV_Front = GenerateBirdsView(nIndex+1, 0,  1000, 1000);
+		cv::Mat mNextSV_Left = GenerateBirdsView(nIndex+1, 1,  1000, 1000);
+		cv::Mat mNextSV_Back = GenerateBirdsView(nIndex+1, 2,  1000, 1000);
+		cv::Mat mNextSV_Right = GenerateBirdsView(nIndex+1, 3,  1000, 1000);
+
+
+
 		vector<cv::Mat> gSurroundViews = {
 			mSurroundView_Front,
 			mSurroundView_Left,
@@ -754,39 +1110,167 @@ bool SurroundView::OptimizeWithMultiFrame(vector<int> gIndices){
 		};
 
 
+
+		vector<cv::Mat> gNextSVs = {
+			mNextSV_Front,
+			mNextSV_Left,
+			mNextSV_Back,
+			mNextSV_Right
+		};
+
+
 		//FL
-		this->AddCoupleEdges(nIndex,
-							 0, 1,
-							 gSurroundViews, 
-							 gGrayROI_FL_1[i],
-							 gGrayROI_FL_2[i]);
+		this->AddCullingEdges(nIndex,
+							  0, 1,
+							  gSurroundViews, 
+							  gNextSVs,
+							  gGrayROI_FL_1[i],
+							  gGrayROI_FL_2[i]);
+
 
 		//BL
-		this->AddCoupleEdges(nIndex,
-							 2, 1,
-							 gSurroundViews, 
-							 gGrayROI_BL_1[i], 
-							 gGrayROI_BL_2[i]);
+		this->AddCullingEdges(nIndex,
+							  2, 1,
+							  gSurroundViews, 
+							  gNextSVs,
+							  gGrayROI_BL_1[i], 
+							  gGrayROI_BL_2[i]);
 
 		//FR
-		this->AddCoupleEdges(nIndex,
-							 0, 3,
-							 gSurroundViews, 
-							 gGrayROI_FR_1[i], 
-							 gGrayROI_FR_2[i]);
+		this->AddCullingEdges(nIndex,
+							  0, 3,
+							  gSurroundViews, 
+							  gNextSVs,
+							  gGrayROI_FR_1[i], 
+							  gGrayROI_FR_2[i]);
 
 		//BR
-		this->AddCoupleEdges(nIndex,
-							 2, 3,
-							 gSurroundViews, 
-							 gGrayROI_BR_1[i],
-							 gGrayROI_BR_2[i]);
+		this->AddCullingEdges(nIndex,
+							  2, 3,
+							  gSurroundViews, 
+							  gNextSVs,
+							  gGrayROI_BR_1[i],
+							  gGrayROI_BR_2[i]);
 
 
 		
 	}
-	
 	this->m_pOptimizer->Optimize();
+
+
 }
+
+
+
+
+
+vector<vector<Sophus::SE3>> SurroundView::OptimizeWithCulling(vector<int> gIndices, ofstream & fOutFile){
+	vector<cv::Mat> gGrayROI_Right, gGrayROI_Left;
+	vector<cv::Mat> gGrayROI_Right2, gGrayROI_Left2;
+
+
+	vector<cv::Mat> gGrayROI_FL_1, gGrayROI_FL_2;
+	vector<cv::Mat> gGrayROI_BL_1, gGrayROI_BL_2;
+	vector<cv::Mat> gGrayROI_FR_1, gGrayROI_FR_2;
+	vector<cv::Mat> gGrayROI_BR_1, gGrayROI_BR_2;
+
+
+	
+	for (int i=0;i<gIndices.size();i++){
+		cv::Mat mGrayROI_FL_1, mGrayROI_FL_2;
+		cv::Mat mGrayROI_BL_1, mGrayROI_BL_2;
+		cv::Mat mGrayROI_FR_1, mGrayROI_FR_2;
+		cv::Mat mGrayROI_BR_1, mGrayROI_BR_2;
+
+		gGrayROI_FL_1.push_back(mGrayROI_FL_1);
+		gGrayROI_FL_2.push_back(mGrayROI_FL_2);
+
+		gGrayROI_BL_1.push_back(mGrayROI_BL_1);
+		gGrayROI_BL_2.push_back(mGrayROI_BL_2);
+
+		gGrayROI_FR_1.push_back(mGrayROI_FR_1);
+		gGrayROI_FR_2.push_back(mGrayROI_FR_2);
+
+		gGrayROI_BR_1.push_back(mGrayROI_BR_1);
+		gGrayROI_BR_2.push_back(mGrayROI_BR_2);
+	}
+
+
+	for (int i=0;i<gIndices.size();i++){
+		int nIndex = gIndices[i];
+		cv::Mat mSurroundView_Front = GenerateBirdsView(nIndex, 0,  1000, 1000);
+		cv::Mat mSurroundView_Left = GenerateBirdsView(nIndex, 1,  1000, 1000);
+		cv::Mat mSurroundView_Back = GenerateBirdsView(nIndex, 2,  1000, 1000);
+		cv::Mat mSurroundView_Right = GenerateBirdsView(nIndex, 3,  1000, 1000);
+
+		cv::Mat mNextSV_Front = GenerateBirdsView(nIndex+1, 0,  1000, 1000);
+		cv::Mat mNextSV_Left = GenerateBirdsView(nIndex+1, 1,  1000, 1000);
+		cv::Mat mNextSV_Back = GenerateBirdsView(nIndex+1, 2,  1000, 1000);
+		cv::Mat mNextSV_Right = GenerateBirdsView(nIndex+1, 3,  1000, 1000);
+
+
+
+		vector<cv::Mat> gSurroundViews = {
+			mSurroundView_Front,
+			mSurroundView_Left,
+			mSurroundView_Back,
+			mSurroundView_Right
+		};
+
+
+
+		vector<cv::Mat> gNextSVs = {
+			mNextSV_Front,
+			mNextSV_Left,
+			mNextSV_Back,
+			mNextSV_Right
+		};
+
+
+		//FL
+		this->AddCullingEdges(nIndex,
+							  0, 1,
+							  gSurroundViews, 
+							  gNextSVs,
+							  gGrayROI_FL_1[i],
+							  gGrayROI_FL_2[i]);
+
+
+		//BL
+		this->AddCullingEdges(nIndex,
+							  2, 1,
+							  gSurroundViews, 
+							  gNextSVs,
+							  gGrayROI_BL_1[i], 
+							  gGrayROI_BL_2[i]);
+
+		//FR
+		this->AddCullingEdges(nIndex,
+							  0, 3,
+							  gSurroundViews, 
+							  gNextSVs,
+							  gGrayROI_FR_1[i], 
+							  gGrayROI_FR_2[i]);
+
+		//BR
+		this->AddCullingEdges(nIndex,
+							  2, 3,
+							  gSurroundViews, 
+							  gNextSVs,
+							  gGrayROI_BR_1[i],
+							  gGrayROI_BR_2[i]);
+
+
+		
+	}
+	// ofstream fOutFile("./ROECS/");
+
+	vector<vector<Sophus::SE3>> gPoses = this->m_pOptimizer->Optimize(fOutFile);
+	return gPoses;
+}
+
+
+
+
 
 

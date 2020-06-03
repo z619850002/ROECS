@@ -23,6 +23,15 @@ public:
 	
 	vector<cv::Point2d> GetPixels(cv::Mat & mROI);
 
+
+	vector<cv::Point2d> GetPixels(cv::Mat & mROI , int nCameraIndex , int nChooseCameraIndex);
+
+	vector<cv::Point2d> GetCullingPixels(cv::Mat & mROI,
+ 										 cv::Mat & mCurrentImage, 
+ 										 cv::Mat & mNextImage,
+										 cv::Rect iROI);
+
+
 private:
 	vector<cv::Point2d> GetDensePixels(cv::Mat & mROI);
 

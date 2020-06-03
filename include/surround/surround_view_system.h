@@ -75,11 +75,23 @@ public:
 					cv::Mat & mGrayROI_1,
 					cv::Mat & mGrayROI_2);
 
+	//Add edges with culling strategy.
+	bool AddCullingEdges(int nIndex, 
+					int nCameraIndex_1, int nCameraIndex_2,
+					vector<cv::Mat> & gSurroundViews,
+					vector<cv::Mat> & gNextSVs,
+					cv::Mat & mGrayROI_1,
+					cv::Mat & mGrayROI_2);
+
 
 	//Use one pair of frames to optimize the pose.
 	bool OptimizePoseWithOneFrame(int nIndex);
 	//Use multiple frames to optimize the pose.
 	bool OptimizeWithMultiFrame(vector<int> gIndices);
+	//Use culling strategy to optimize the pose.
+	bool OptimizeWithCulling(vector<int> gIndices);
+
+	vector<vector<Sophus::SE3>> OptimizeWithCulling(vector<int> gIndices, ofstream & fOutFile);
 
 
 	//Cameras in the surround-view system.
