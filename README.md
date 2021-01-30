@@ -1,4 +1,4 @@
-# OECS: Online Extrinsics Correction for the Surround-view system
+# ROECS: Robust Online Extrinsics Correction for the Surround-view system
 
 # 1. Prerequisites
 We have tested the library in **Ubuntu 14.04**, but it should be easy to compile in other platforms.
