@@ -1,2 +1,6 @@
 ADD_EXECUTABLE(online_correction online_correction.cpp)
 TARGET_LINK_LIBRARIES( online_correction dynamic_adjustment)
+
+
+ADD_EXECUTABLE(main_pipeline main_pipeline.cpp)
+TARGET_LINK_LIBRARIES( main_pipeline dynamic_adjustment)

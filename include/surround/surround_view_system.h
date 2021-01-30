@@ -91,8 +91,12 @@ public:
 	//Use culling strategy to optimize the pose.
 	bool OptimizeWithCulling(vector<int> gIndices);
 
+
 	vector<vector<Sophus::SE3>> OptimizeWithCulling(vector<int> gIndices, ofstream & fOutFile);
 
+	bool Optimize();
+
+	void StartPipeline();
 
 	//Cameras in the surround-view system.
 	Camera * m_pFrontCamera;
@@ -111,7 +115,15 @@ public:
 
 	vector<SVPair> m_gDistortedPairs;
 
+
 	SurroundOptimizer * m_pOptimizer;
+
+	int m_nFrameNum_FL;
+	int m_nFrameNum_LB;
+	int m_nFrameNum_BR;
+	int m_nFrameNum_RF;
+
+	int m_nLocalWindowSize;
 	
 };
 

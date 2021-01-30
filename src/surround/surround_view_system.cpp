@@ -79,6 +79,13 @@ SurroundView::SurroundView(){
 	this->m_iROI_RF = cv::Rect(ROI_RF_x,ROI_RF_y,ROI_RF_w + 100,ROI_RF_h+70);
 
 
+	this->m_nFrameNum_FL = 0;
+	this->m_nFrameNum_LB = 0;
+	this->m_nFrameNum_BR = 0;
+	this->m_nFrameNum_RF = 0;
+
+	this->m_nLocalWindowSize = 5;
+
 	// this->m_iROI_FL = cv::Rect(ROI_FL_x,ROI_FL_y,ROI_FL_w,ROI_FL_h);
 	// this->m_iROI_LB = cv::Rect(ROI_LB_x,ROI_LB_y,ROI_LB_w,ROI_LB_h);
 	// this->m_iROI_BR = cv::Rect(ROI_BR_x,ROI_BR_y,ROI_BR_w,ROI_BR_h);
@@ -134,6 +141,14 @@ SurroundView::SurroundView(	Camera * pFrontCamera, Camera * pLeftCamera,
 		this->m_pLeftCamera,
 		this->m_pBackCamera,
 		this->m_pRightCamera);
+
+
+	this->m_nFrameNum_FL = 0;
+	this->m_nFrameNum_LB = 0;
+	this->m_nFrameNum_BR = 0;
+	this->m_nFrameNum_RF = 0;
+
+	this->m_nLocalWindowSize = 5;
 	
 }
 
@@ -838,28 +853,28 @@ bool SurroundView::AddCullingEdges(int nIndex,
 												 			  iBirdsEstimateROI);
 	vector<cv::Point2d> gPoints_2 = iSelection.GetPixels(mBirdseyeGray_1);
 
-	if (gPoints_2.size() != gPoints.size()){
-		// cv::imshow("Culling", gSurroundViews[nCameraIndex_1]);
-		// cv::waitKey(0);
+	// if (gPoints_2.size() != gPoints.size()){
+	// 	// cv::imshow("Culling", gSurroundViews[nCameraIndex_1]);
+	// 	// cv::waitKey(0);
 
-		cv::Mat mBirdseyeROI_1_clone1 = DrawPoints(mBirdseyeROI_1, gPoints);
-		cv::Mat mBirdseyeROI_1_clone2 = DrawPoints(mBirdseyeROI_1, gPoints_2);
+	// 	cv::Mat mBirdseyeROI_1_clone1 = DrawPoints(mBirdseyeROI_1, gPoints);
+	// 	cv::Mat mBirdseyeROI_1_clone2 = DrawPoints(mBirdseyeROI_1, gPoints_2);
 
-		// for (auto item : gPoints){
-		// 	cv::circle(mBirdseyeROI_1_clone1, item, 3, cv::Scalar(100 , 0 , 0));
-		// }
-		// for (auto item : gPoints_2){
-		// 	cv::circle(mBirdseyeROI_1_clone2, item, 3, cv::Scalar(100 , 0 , 0));
-		// }
-		// cv::imshow("Culling", mBirdseyeROI_1);
-		stringstream ss;
-		ss << nIndex << "_" << nCameraIndex_1 << "_" << nCameraIndex_2;
-		string aTag = "";
-		ss >> aTag;
-		cv::imwrite("./culling/culling_ROI_" + aTag + "_c.jpg", mBirdseyeROI_1_clone1);
-		cv::imwrite("./culling/culling_ROI_" + aTag + "_g.jpg", mBirdseyeROI_1_clone2);
-		cv::waitKey(30);	
-	}
+	// 	// for (auto item : gPoints){
+	// 	// 	cv::circle(mBirdseyeROI_1_clone1, item, 3, cv::Scalar(100 , 0 , 0));
+	// 	// }
+	// 	// for (auto item : gPoints_2){
+	// 	// 	cv::circle(mBirdseyeROI_1_clone2, item, 3, cv::Scalar(100 , 0 , 0));
+	// 	// }
+	// 	// cv::imshow("Culling", mBirdseyeROI_1);
+	// 	stringstream ss;
+	// 	ss << nIndex << "_" << nCameraIndex_1 << "_" << nCameraIndex_2;
+	// 	string aTag = "";
+	// 	ss >> aTag;
+	// 	cv::imwrite("./culling/culling_ROI_" + aTag + "_c.jpg", mBirdseyeROI_1_clone1);
+	// 	cv::imwrite("./culling/culling_ROI_" + aTag + "_g.jpg", mBirdseyeROI_1_clone2);
+	// 	cv::waitKey(30);	
+	// }
 	
 
 	cout << "Edge size " << gPoints.size() << endl;
@@ -906,6 +921,8 @@ bool SurroundView::AddCullingEdges(int nIndex,
         	&mGrayROI_2);
 
 	}
+
+	return true;
 }
 
 
@@ -1272,5 +1289,171 @@ vector<vector<Sophus::SE3>> SurroundView::OptimizeWithCulling(vector<int> gIndic
 
 
 
+bool SurroundView::Optimize(){
+
+	this->m_pOptimizer->Optimize();
+	return true;
+}
 
 
+
+
+void SurroundView::StartPipeline(){
+
+	vector<cv::Mat> gGrayROI_Right, gGrayROI_Left;
+	vector<cv::Mat> gGrayROI_Right2, gGrayROI_Left2;
+
+
+	vector<cv::Mat> gGrayROI_FL_1, gGrayROI_FL_2;
+	vector<cv::Mat> gGrayROI_BL_1, gGrayROI_BL_2;
+	vector<cv::Mat> gGrayROI_FR_1, gGrayROI_FR_2;
+	vector<cv::Mat> gGrayROI_BR_1, gGrayROI_BR_2;
+
+
+	
+	for (int i=0;i<this->m_gDistortedPairs.size();i++){
+		cv::Mat mGrayROI_FL_1, mGrayROI_FL_2;
+		cv::Mat mGrayROI_BL_1, mGrayROI_BL_2;
+		cv::Mat mGrayROI_FR_1, mGrayROI_FR_2;
+		cv::Mat mGrayROI_BR_1, mGrayROI_BR_2;
+
+		gGrayROI_FL_1.push_back(mGrayROI_FL_1);
+		gGrayROI_FL_2.push_back(mGrayROI_FL_2);
+
+		gGrayROI_BL_1.push_back(mGrayROI_BL_1);
+		gGrayROI_BL_2.push_back(mGrayROI_BL_2);
+
+		gGrayROI_FR_1.push_back(mGrayROI_FR_1);
+		gGrayROI_FR_2.push_back(mGrayROI_FR_2);
+
+		gGrayROI_BR_1.push_back(mGrayROI_BR_1);
+		gGrayROI_BR_2.push_back(mGrayROI_BR_2);
+	}
+
+
+
+	int nSkip = 0;
+	bool bOptimize = false;
+	bool bFinishOptimize = false;
+
+	for (int nIndex=0;nIndex < this->m_gDistortedPairs.size();nIndex++){
+		cv::Mat mSurroundView = this->GenerateSurroundView(nIndex, 1000, 1000);
+
+		if (!bFinishOptimize){
+			if (nSkip == 0){
+
+
+				cv::Mat mSurroundView_Front = GenerateBirdsView(nIndex, 0,  1000, 1000);
+				cv::Mat mSurroundView_Left = GenerateBirdsView(nIndex, 1,  1000, 1000);
+				cv::Mat mSurroundView_Back = GenerateBirdsView(nIndex, 2,  1000, 1000);
+				cv::Mat mSurroundView_Right = GenerateBirdsView(nIndex, 3,  1000, 1000);
+
+				cv::Mat mNextSV_Front = GenerateBirdsView(nIndex+1, 0,  1000, 1000);
+				cv::Mat mNextSV_Left = GenerateBirdsView(nIndex+1, 1,  1000, 1000);
+				cv::Mat mNextSV_Back = GenerateBirdsView(nIndex+1, 2,  1000, 1000);
+				cv::Mat mNextSV_Right = GenerateBirdsView(nIndex+1, 3,  1000, 1000);
+
+
+
+				vector<cv::Mat> gSurroundViews = {
+					mSurroundView_Front,
+					mSurroundView_Left,
+					mSurroundView_Back,
+					mSurroundView_Right
+				};
+
+
+
+				vector<cv::Mat> gNextSVs = {
+					mNextSV_Front,
+					mNextSV_Left,
+					mNextSV_Back,
+					mNextSV_Right
+				};
+
+				int i = nIndex;
+				//FL
+				bool bRes1 = this->AddCullingEdges(nIndex,
+									  0, 1,
+									  gSurroundViews, 
+									  gNextSVs,
+									  gGrayROI_FL_1[i],
+									  gGrayROI_FL_2[i]);
+
+
+				//BL
+				bool bRes2 = this->AddCullingEdges(nIndex,
+									  2, 1,
+									  gSurroundViews, 
+									  gNextSVs,
+									  gGrayROI_BL_1[i], 
+									  gGrayROI_BL_2[i]);
+
+				//FR
+				bool bRes3 = this->AddCullingEdges(nIndex,
+									  0, 3,
+									  gSurroundViews, 
+									  gNextSVs,
+									  gGrayROI_FR_1[i], 
+									  gGrayROI_FR_2[i]);
+
+				//BR
+				bool bRes4 = this->AddCullingEdges(nIndex,
+									  2, 3,
+									  gSurroundViews, 
+									  gNextSVs,
+									  gGrayROI_BR_1[i],
+									  gGrayROI_BR_2[i]);
+
+
+				if (bRes1){
+					this->m_nFrameNum_FL+=1;
+				}
+
+				if (bRes2){
+					this->m_nFrameNum_LB+=1;
+				}
+
+
+				if (bRes3){
+					this->m_nFrameNum_BR+=1;
+				}
+
+				
+				if (bRes4){
+					this->m_nFrameNum_RF+=1;
+				}
+
+
+
+				if (this->m_nFrameNum_FL > m_nLocalWindowSize && 
+					this->m_nFrameNum_LB > m_nLocalWindowSize && 
+					this->m_nFrameNum_BR > m_nLocalWindowSize && 
+					this->m_nFrameNum_RF > m_nLocalWindowSize){
+					bOptimize = true;	
+				}
+
+			}
+
+			if (nSkip >=5){
+				nSkip = -1;
+			}
+			nSkip++;
+
+		}
+
+
+		cv::imshow("const cv::String &winname", mSurroundView);
+		cv::waitKey(30);
+
+
+		if (bOptimize && !bFinishOptimize){
+			cout << "Start the optimization!" << endl;
+			this->Optimize();
+			bFinishOptimize = true;
+		}
+		
+	}
+
+
+}

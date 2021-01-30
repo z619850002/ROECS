@@ -369,7 +369,7 @@ bool SurroundOptimizer::Optimize(){
 
 	m_iOptimizer.initializeOptimization();
     
-
+    cout << "Finish Initialization!" << endl;
 
     m_iOptimizer.optimize(10);
     m_iOptimizer.optimize(100);
