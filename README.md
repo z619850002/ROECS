@@ -21,7 +21,7 @@ We use [g2o](https://github.com/RainerKuemmerle/g2o) library to perform non-line
 # 2. Building the project
 We use CMake to build the project on ubuntu 14.04.
 ```
-cd OECS/
+cd ROECS/
 mkdir build
 cd build
 cmake ..
